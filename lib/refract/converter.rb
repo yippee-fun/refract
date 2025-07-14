@@ -2,28 +2,40 @@
 
 module Refract
 	class Converter < Prism::BasicVisitor
-		def visit_alias_global_variable_node(node)
+		def self.visit(node_class, &)
+			raise ArgumentError unless Class === node_class && Prism::Node > node_class
+			type = node_class.type.name
+
+			define_method("visit_#{type}") do |node|
+				raise ArgumentError unless node_class === node
+				return_value = instance_exec(node, &)
+				raise ArgumentError unless NodeInstance === return_value
+				return_value
+			end
+		end
+
+		visit Prism::AliasGlobalVariableNode do |node|
 			AliasGlobalVariableNode.new(
 				new_name: visit(node.new_name),
 				old_name: visit(node.old_name),
 			)
 		end
 
-		def visit_alias_method_node(node)
+		visit Prism::AliasMethodNode do |node|
 			AliasMethodNode.new(
 				new_name: visit(node.new_name),
 				old_name: visit(node.old_name),
 			)
 		end
 
-		def visit_alternation_pattern_node(node)
+		visit Prism::AlternationPatternNode do |node|
 			AlternationPatternNode.new(
 				left: visit(node.left),
 				right: visit(node.right),
 			)
 		end
 
-		def visit_and_node(node)
+		visit Prism::AndNode do |node|
 			AndNode.new(
 				left: visit(node.left),
 				operator: node.operator_loc.slice,
@@ -31,19 +43,19 @@ module Refract
 			)
 		end
 
-		def visit_arguments_node(node)
+		visit Prism::ArgumentsNode do |node|
 			ArgumentsNode.new(
-				arguments: node.arguments.map { |n| visit(n) }
+				arguments: node.arguments&.map { |n| visit(n) }
 			)
 		end
 
-		def visit_array_node(node)
+		visit Prism::ArrayNode do |node|
 			ArrayNode.new(
-				elements: node.elements.map { |n| visit(n) }
+				elements: node.elements&.map { |n| visit(n) }
 			)
 		end
 
-		def visit_array_pattern_node(node)
+		visit Prism::ArrayPatternNode do |node|
 			ArrayPatternNode.new(
 				constant: visit(node.constant),
 				requireds: node.requireds&.map { |n| visit(n) },
@@ -52,624 +64,731 @@ module Refract
 			)
 		end
 
-		def visit_assoc_node(node)
+		visit Prism::AssocNode do |node|
 			AssocNode.new(
 				key: visit(node.key),
 				value: visit(node.value),
 			)
 		end
 
-		def visit_assoc_splat_node(node)
+		visit Prism::AssocSplatNode do |node|
 			AssocSplatNode.new(
 				value: visit(node.value)
 			)
 		end
 
-		def visit_back_reference_read_node(node)
+		visit Prism::BackReferenceReadNode do |node|
 			BackReferenceReadNode.new(
 				name: node.name
 			)
 		end
 
-		def visit_begin_node(node)
+		visit Prism::BeginNode do |node|
 			BeginNode.new(
 				statements: visit(node.statements),
-				rescue_clause: visit(node.rescue_clause)
+				rescue_clause: visit(node.rescue_clause),
+				else_clause: visit(node.else_clause),
+				ensure_clause: visit(node.ensure_clause),
 			)
 		end
 
-		def visit_block_argument_node(node)
-			binding.irb
-		end
-
-		def visit_block_local_variable_node(node)
-			binding.irb
-		end
-
-		def visit_block_node(node)
-			binding.irb
-		end
-
-		def visit_block_parameter_node(node)
-			binding.irb
-		end
-
-		def visit_block_parameters_node(node)
-			binding.irb
-		end
-
-		def visit_break_node(node)
-			binding.irb
-		end
-
-		def visit_call_and_write_node(node)
-			binding.irb
-		end
-
-		def visit_call_node(node)
-			CallNode.new(
-				receiver: visit(node.receiver),
-				message: node.message,
-				arguments: visit(node.arguments),
+		visit Prism::BlockArgumentNode do |node|
+			BlockArgumentNode.new(
+				expression: visit(node.expression)
 			)
 		end
 
-		def visit_call_operator_write_node(node)
-			binding.irb
-		end
-
-		def visit_call_or_write_node(node)
-			binding.irb
-		end
-
-		def visit_call_target_node(node)
-			binding.irb
-		end
-
-		def visit_capture_pattern_node(node)
-			binding.irb
-		end
-
-		def visit_case_match_node(node)
-			binding.irb
-		end
-
-		def visit_case_node(node)
-			binding.irb
-		end
-
-		def visit_class_node(node)
-			binding.irb
-		end
-
-		def visit_class_variable_and_write_node(node)
-			binding.irb
-		end
-
-		def visit_class_variable_operator_write_node(node)
-			binding.irb
-		end
-
-		def visit_class_variable_or_write_node(node)
-			binding.irb
-		end
-
-		def visit_class_variable_read_node(node)
-			binding.irb
-		end
-
-		def visit_class_variable_target_node(node)
-			binding.irb
-		end
-
-		def visit_class_variable_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_and_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_operator_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_or_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_path_and_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_path_node(node)
-			binding.irb
-		end
-
-		def visit_constant_path_operator_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_path_or_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_path_target_node(node)
-			binding.irb
-		end
-
-		def visit_constant_path_write_node(node)
-			binding.irb
-		end
-
-		def visit_constant_read_node(node)
-			ConstantReadNode.new(
+		visit Prism::BlockLocalVariableNode do |node|
+			BlockLocalVariableNode.new(
 				name: node.name
 			)
 		end
 
-		def visit_constant_target_node(node)
+		visit Prism::BlockNode do |node|
+			BlockNode.new(
+				parameters: visit(node.parameters),
+				body: visit(node.body)
+			)
+		end
+
+		visit Prism::BlockParameterNode do |node|
+			BlockParameterNode.new(
+				name: node.name
+			)
+		end
+
+		visit Prism::BlockParametersNode do |node|
+			BlockParametersNode.new(
+				parameters: visit(node.parameters),
+				locals: node.locals&.map { |n| visit(n) }
+			)
+		end
+
+		visit Prism::BreakNode do |node|
+			BreakNode.new(
+				arguments: visit(node.arguments)
+			)
+		end
+
+		visit Prism::CallAndWriteNode do |node|
+			CallAndWriteNode.new(
+				receiver: visit(node.receiver),
+				read_name: node.read_name,
+				value: visit(node.value)
+			)
+		end
+
+		visit Prism::CallNode do |node|
+			CallNode.new(
+				receiver: visit(node.receiver),
+				message: node.message,
+				arguments: visit(node.arguments),
+				block: visit(node.block),
+			)
+		end
+
+		visit Prism::CallOperatorWriteNode do |node|
+			CallOperatorWriteNode.new(
+				receiver: visit(node.receiver),
+				read_name: node.read_name,
+				binary_operator: node.binary_operator,
+				value: visit(node.value),
+			)
+		end
+
+		visit Prism::CallOrWriteNode do |node|
+			CallOrWriteNode.new(
+				receiver: visit(node.receiver),
+				read_name: node.read_name,
+				value: visit(node.value),
+			)
+		end
+
+		visit Prism::CallTargetNode do |node|
+			CallTargetNode.new(
+				receiver: visit(node.receiver),
+				name: node.name,
+			)
+		end
+
+		visit Prism::CapturePatternNode do |node|
+			CapturePatternNode.new(
+				value: visit(node.value),
+				target: visit(node.target),
+			)
+		end
+
+		visit Prism::CaseMatchNode do |node|
+			CaseMatchNode.new(
+				predicate: visit(node.predicate),
+				conditions: node.conditions&.map { |n| visit(n) },
+				else_clause: visit(node.else_clause),
+			)
+		end
+
+		visit Prism::CaseNode do |node|
+			CaseNode.new(
+				predicate: visit(node.predicate),
+				conditions: node.conditions&.map { |n| visit(n) },
+				else_clause: visit(node.else_clause),
+			)
+		end
+
+		visit Prism::ClassNode do |node|
+			ClassNode.new(
+				constant_path: visit(node.constant_path),
+				superclass: visit(node.superclass),
+				body: visit(node.body),
+			)
+		end
+
+		visit Prism::ClassVariableAndWriteNode do |node|
+			ClassVariableAndWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
+		end
+
+		visit Prism::ClassVariableOperatorWriteNode do |node|
+			ClassVariableOperatorWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+				binary_operator: node.binary_operator,
+			)
+		end
+
+		visit Prism::ClassVariableOrWriteNode do |node|
+			ClassVariableOrWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
+		end
+
+		visit Prism::ClassVariableReadNode do |node|
 			binding.irb
 		end
 
-		def visit_constant_write_node(node)
+		visit Prism::ClassVariableTargetNode do |node|
 			binding.irb
 		end
 
-		def visit_def_node(node)
+		visit Prism::ClassVariableWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_defined_node(node)
+		visit Prism::ConstantAndWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_else_node(node)
+		visit Prism::ConstantOperatorWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_embedded_statements_node(node)
+		visit Prism::ConstantOrWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_embedded_variable_node(node)
+		visit Prism::ConstantPathAndWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_ensure_node(node)
+		visit Prism::ConstantPathNode do |node|
+			ConstantPath.new(
+				parent: visit(node.parent),
+				name: node.name,
+			)
+		end
+
+		visit Prism::ConstantPathOperatorWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_false_node(node)
+		visit Prism::ConstantPathOrWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_find_pattern_node(node)
+		visit Prism::ConstantPathTargetNode do |node|
 			binding.irb
 		end
 
-		def visit_flip_flop_node(node)
+		visit Prism::ConstantPathWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_float_node(node)
+		visit Prism::ConstantReadNode do |node|
+			ConstantReadNode.new(
+					name: node.name
+				)
+		end
+
+		visit Prism::ConstantTargetNode do |node|
 			binding.irb
 		end
 
-		def visit_for_node(node)
+		visit Prism::ConstantWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_forwarding_arguments_node(node)
+		visit Prism::DefNode do |node|
+			DefNode.new(
+				name: node.name,
+				receiver: visit(node.receiver),
+				parameters: visit(node.parameters),
+				body: visit(node.body),
+			)
+		end
+
+		visit Prism::DefinedNode do |node|
 			binding.irb
 		end
 
-		def visit_forwarding_parameter_node(node)
+		visit Prism::ElseNode do |node|
+			ElseNode.new(
+				statements: visit(node.statements)
+			)
+		end
+
+		visit Prism::EmbeddedStatementsNode do |node|
 			binding.irb
 		end
 
-		def visit_forwarding_super_node(node)
+		visit Prism::EmbeddedVariableNode do |node|
 			binding.irb
 		end
 
-		def visit_global_variable_and_write_node(node)
+		visit Prism::EnsureNode do |node|
+			EnsureNode.new(
+				statements: visit(node.statements)
+			)
+		end
+
+		visit Prism::FalseNode do |node|
+			FalseNode.new
+		end
+
+		visit Prism::FindPatternNode do |node|
 			binding.irb
 		end
 
-		def visit_global_variable_operator_write_node(node)
+		visit Prism::FlipFlopNode do |node|
 			binding.irb
 		end
 
-		def visit_global_variable_or_write_node(node)
+		visit Prism::FloatNode do |node|
 			binding.irb
 		end
 
-		def visit_global_variable_read_node(node)
+		visit Prism::ForNode do |node|
+			binding.irb
+		end
+
+		visit Prism::ForwardingArgumentsNode do |node|
+			binding.irb
+		end
+
+		visit Prism::ForwardingParameterNode do |node|
+			ForwardingParameterNode.new
+		end
+
+		visit Prism::ForwardingSuperNode do |node|
+			binding.irb
+		end
+
+		visit Prism::GlobalVariableAndWriteNode do |node|
+			binding.irb
+		end
+
+		visit Prism::GlobalVariableOperatorWriteNode do |node|
+			binding.irb
+		end
+
+		visit Prism::GlobalVariableOrWriteNode do |node|
+			binding.irb
+		end
+
+		visit Prism::GlobalVariableReadNode do |node|
 			GlobalVariableReadNode.new(
 				name: node.name
 			)
 		end
 
-		def visit_global_variable_target_node(node)
+		visit Prism::GlobalVariableTargetNode do |node|
 			binding.irb
 		end
 
-		def visit_global_variable_write_node(node)
+		visit Prism::GlobalVariableWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_hash_node(node)
+		visit Prism::HashNode do |node|
 			HashNode.new(
-				elements: node.elements.map { |n| visit(n) }
+				elements: node.elements&.map { |n| visit(n) }
 			)
 		end
 
-		def visit_hash_pattern_node(node)
+		visit Prism::HashPatternNode do |node|
 			binding.irb
 		end
 
-		def visit_if_node(node)
+		visit Prism::IfNode do |node|
 			binding.irb
 		end
 
-		def visit_imaginary_node(node)
+		visit Prism::ImaginaryNode do |node|
 			binding.irb
 		end
 
-		def visit_implicit_node(node)
+		visit Prism::ImplicitNode do |node|
 			ImplicitNode.new(
 				value: visit(node.value)
 			)
 		end
 
-		def visit_implicit_rest_node(node)
+		visit Prism::ImplicitRestNode do |node|
+			ImplicitRestNode.new
+		end
+
+		visit Prism::InNode do |node|
+			InNode.new(
+				pattern: visit(node.pattern),
+				statements: visit(node.statements),
+			)
+		end
+
+		visit Prism::IndexAndWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_in_node(node)
+		visit Prism::IndexOperatorWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_index_and_write_node(node)
+		visit Prism::IndexOrWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_index_operator_write_node(node)
+		visit Prism::IndexTargetNode do |node|
 			binding.irb
 		end
 
-		def visit_index_or_write_node(node)
+		visit Prism::InstanceVariableAndWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_index_target_node(node)
+		visit Prism::InstanceVariableOperatorWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_instance_variable_and_write_node(node)
+		visit Prism::InstanceVariableOrWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_instance_variable_operator_write_node(node)
+		visit Prism::InstanceVariableReadNode do |node|
 			binding.irb
 		end
 
-		def visit_instance_variable_or_write_node(node)
+		visit Prism::InstanceVariableTargetNode do |node|
 			binding.irb
 		end
 
-		def visit_instance_variable_read_node(node)
+		visit Prism::InstanceVariableWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_instance_variable_target_node(node)
-			binding.irb
-		end
-
-		def visit_instance_variable_write_node(node)
-			binding.irb
-		end
-
-		def visit_integer_node(node)
+		visit Prism::IntegerNode do |node|
 			IntegerNode.new(
 				value: node.value
 			)
 		end
 
-		def visit_interpolated_match_last_line_node(node)
+		visit Prism::InterpolatedMatchLastLineNode do |node|
 			binding.irb
 		end
 
-		def visit_interpolated_regular_expression_node(node)
+		visit Prism::InterpolatedRegularExpressionNode do |node|
 			binding.irb
 		end
 
-		def visit_interpolated_string_node(node)
+		visit Prism::InterpolatedStringNode do |node|
 			binding.irb
 		end
 
-		def visit_interpolated_symbol_node(node)
+		visit Prism::InterpolatedSymbolNode do |node|
 			binding.irb
 		end
 
-		def visit_interpolated_x_string_node(node)
+		visit Prism::InterpolatedXStringNode do |node|
 			binding.irb
 		end
 
-		def visit_it_local_variable_read_node(node)
+		visit Prism::ItLocalVariableReadNode do |node|
 			binding.irb
 		end
 
-		def visit_it_parameters_node(node)
+		visit Prism::ItParametersNode do |node|
 			binding.irb
 		end
 
-		def visit_keyword_hash_node(node)
+		visit Prism::KeywordHashNode do |node|
 			KeywordHashNode.new(
-				elements: node.elements.map { |n| visit(n) }
+				elements: node.elements&.map { |n| visit(n) }
 			)
 		end
 
-		def visit_keyword_rest_parameter_node(node)
+		visit Prism::KeywordRestParameterNode do |node|
+			KeywordRestParameterNode.new(
+				name: node.name
+			)
+		end
+
+		visit Prism::LambdaNode do |node|
 			binding.irb
 		end
 
-		def visit_lambda_node(node)
+		visit Prism::LocalVariableAndWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_local_variable_and_write_node(node)
+		visit Prism::LocalVariableOperatorWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_local_variable_operator_write_node(node)
+		visit Prism::LocalVariableOrWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_local_variable_or_write_node(node)
-			binding.irb
+		visit Prism::LocalVariableReadNode do |node|
+			LocalVariableReadNode.new(
+				name: node.name
+			)
 		end
 
-		def visit_local_variable_read_node(node)
-			binding.irb
-		end
-
-		def visit_local_variable_target_node(node)
+		visit Prism::LocalVariableTargetNode do |node|
 			LocalVariableTargetNode.new(
 				name: node.name
 			)
 		end
 
-		def visit_local_variable_write_node(node)
+		visit Prism::LocalVariableWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_match_last_line_node(node)
+		visit Prism::MatchLastLineNode do |node|
 			binding.irb
 		end
 
-		def visit_match_predicate_node(node)
+		visit Prism::MatchPredicateNode do |node|
 			MatchPredicateNode.new(
 				value: visit(node.value),
 				pattern: visit(node.pattern),
 			)
 		end
 
-		def visit_match_required_node(node)
+		visit Prism::MatchRequiredNode do |node|
 			MatchRequiredNode.new(
 				value: visit(node.value),
 				pattern: visit(node.pattern),
 			)
 		end
 
-		def visit_match_write_node(node)
+		visit Prism::MatchWriteNode do |node|
 			binding.irb
 		end
 
-		def visit_missing_node(node)
+		visit Prism::MissingNode do |node|
 			binding.irb
 		end
 
-		def visit_module_node(node)
+		visit Prism::ModuleNode do |node|
 			binding.irb
 		end
 
-		def visit_multi_target_node(node)
+		visit Prism::MultiTargetNode do |node|
 			binding.irb
 		end
 
-		def visit_multi_write_node(node)
+		visit Prism::MultiWriteNode do |node|
+			MultiWriteNode.new(
+				lefts: node.lefts&.map { |n| visit(n) },
+				rest: visit(node.rest),
+				rights: node.rights&.map { |n| visit(n) },
+				value: visit(node.value),
+			)
+		end
+
+		visit Prism::NextNode do |node|
 			binding.irb
 		end
 
-		def visit_next_node(node)
+		visit Prism::NilNode do |node|
+			NilNode.new
+		end
+
+		visit Prism::NoKeywordsParameterNode do |node|
 			binding.irb
 		end
 
-		def visit_nil_node(node)
+		visit Prism::NumberedParametersNode do |node|
 			binding.irb
 		end
 
-		def visit_no_keywords_parameter_node(node)
+		visit Prism::NumberedReferenceReadNode do |node|
 			binding.irb
 		end
 
-		def visit_numbered_parameters_node(node)
+		visit Prism::OptionalKeywordParameterNode do |node|
+			OptionalKeywordParameterNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
+		end
+
+		visit Prism::OptionalParameterNode do |node|
+			OptionalParameterNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
+		end
+
+		visit Prism::OrNode do |node|
 			binding.irb
 		end
 
-		def visit_numbered_reference_read_node(node)
+		visit Prism::ParametersNode do |node|
+			ParametersNode.new(
+				requireds: node.requireds&.map { |n| visit(n) },
+				optionals: node.optionals&.map { |n| visit(n) },
+				rest: visit(node.rest),
+				posts: node.posts&.map { |n| visit(n) },
+				keywords: node.keywords&.map { |n| visit(n) },
+				keyword_rest: visit(node.keyword_rest),
+				block: visit(node.block)
+			)
+		end
+
+		visit Prism::ParenthesesNode do |node|
 			binding.irb
 		end
 
-		def visit_optional_keyword_parameter_node(node)
+		visit Prism::PinnedExpressionNode do |node|
 			binding.irb
 		end
 
-		def visit_optional_parameter_node(node)
+		visit Prism::PinnedVariableNode do |node|
 			binding.irb
 		end
 
-		def visit_or_node(node)
+		visit Prism::PostExecutionNode do |node|
 			binding.irb
 		end
 
-		def visit_parameters_node(node)
+		visit Prism::PreExecutionNode do |node|
 			binding.irb
 		end
 
-		def visit_parentheses_node(node)
-			binding.irb
-		end
-
-		def visit_pinned_expression_node(node)
-			binding.irb
-		end
-
-		def visit_pinned_variable_node(node)
-			binding.irb
-		end
-
-		def visit_post_execution_node(node)
-			binding.irb
-		end
-
-		def visit_pre_execution_node(node)
-			binding.irb
-		end
-
-		def visit_program_node(node)
+		visit Prism::ProgramNode do |node|
 			visit(node.statements)
 		end
 
-		def visit_range_node(node)
+		visit Prism::RangeNode do |node|
 			binding.irb
 		end
 
-		def visit_rational_node(node)
+		visit Prism::RationalNode do |node|
 			binding.irb
 		end
 
-		def visit_redo_node(node)
+		visit Prism::RedoNode do |node|
 			binding.irb
 		end
 
-		def visit_regular_expression_node(node)
+		visit Prism::RegularExpressionNode do |node|
 			binding.irb
 		end
 
-		def visit_required_keyword_parameter_node(node)
+		visit Prism::RequiredKeywordParameterNode do |node|
+			RequiredKeywordParameterNode.new(
+				name: node.name
+			)
+		end
+
+		visit Prism::RequiredParameterNode do |node|
+			RequiredParameterNode.new(
+				name: node.name
+			)
+		end
+
+		visit Prism::RescueModifierNode do |node|
 			binding.irb
 		end
 
-		def visit_required_parameter_node(node)
-			binding.irb
-		end
-
-		def visit_rescue_modifier_node(node)
-			binding.irb
-		end
-
-		def visit_rescue_node(node)
+		visit Prism::RescueNode do |node|
 			RescueNode.new(
-				exceptions: node.exceptions.map { |n| visit(n) },
+				exceptions: node.exceptions&.map { |n| visit(n) },
 				reference: visit(node.reference),
 				statements: visit(node.statements),
 				subsequent: visit(node.subsequent),
 			)
 		end
 
-		def visit_rest_parameter_node(node)
+		visit Prism::RestParameterNode do |node|
+			RestParameterNode.new(
+				name: node.name
+			)
+		end
+
+		visit Prism::RetryNode do |node|
 			binding.irb
 		end
 
-		def visit_retry_node(node)
+		visit Prism::ReturnNode do |node|
 			binding.irb
 		end
 
-		def visit_return_node(node)
+		visit Prism::SelfNode do |node|
 			binding.irb
 		end
 
-		def visit_self_node(node)
+		visit Prism::ShareableConstantNode do |node|
 			binding.irb
 		end
 
-		def visit_shareable_constant_node(node)
+		visit Prism::SingletonClassNode do |node|
 			binding.irb
 		end
 
-		def visit_singleton_class_node(node)
+		visit Prism::SourceEncodingNode do |node|
 			binding.irb
 		end
 
-		def visit_source_encoding_node(node)
+		visit Prism::SourceFileNode do |node|
 			binding.irb
 		end
 
-		def visit_source_file_node(node)
+		visit Prism::SourceLineNode do |node|
 			binding.irb
 		end
 
-		def visit_source_line_node(node)
-			binding.irb
-		end
-
-		def visit_splat_node(node)
+		visit Prism::SplatNode do |node|
 			SplatNode.new(
 				expression: visit(node.expression)
 			)
 		end
 
-		def visit_statements_node(node)
+		visit Prism::StatementsNode do |node|
 			StatementsNode.new(
-				body: node.body.map { |n| visit(n) }
+				body: node.body&.map { |n| visit(n) }
 			)
 		end
 
-		def visit_string_node(node)
+		visit Prism::StringNode do |node|
+			StringNode.new(
+				unescaped: node.unescaped
+			)
+		end
+
+		visit Prism::SuperNode do |node|
 			binding.irb
 		end
 
-		def visit_super_node(node)
-			binding.irb
-		end
-
-		def visit_symbol_node(node)
+		visit Prism::SymbolNode do |node|
 			SymbolNode.new(
 				unescaped: node.unescaped
 			)
 		end
 
-		def visit_true_node(node)
+		visit Prism::TrueNode do |node|
+			TrueNode.new
+		end
+
+		visit Prism::UndefNode do |node|
 			binding.irb
 		end
 
-		def visit_undef_node(node)
+		visit Prism::UnlessNode do |node|
 			binding.irb
 		end
 
-		def visit_unless_node(node)
+		visit Prism::UntilNode do |node|
 			binding.irb
 		end
 
-		def visit_until_node(node)
+		visit Prism::WhenNode do |node|
+			WhenNode.new(
+				conditions: node.conditions&.map { |n| visit(n) },
+				statements: visit(node.statements),
+			)
+		end
+
+		visit Prism::WhileNode do |node|
 			binding.irb
 		end
 
-		def visit_when_node(node)
+		visit Prism::XStringNode do |node|
 			binding.irb
 		end
 
-		def visit_while_node(node)
-			binding.irb
-		end
-
-		def visit_x_string_node(node)
-			binding.irb
-		end
-
-		def visit_yield_node(node)
+		visit Prism::YieldNode do |node|
 			binding.irb
 		end
 	end

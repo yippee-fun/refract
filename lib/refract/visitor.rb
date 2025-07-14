@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
 module Refract
-	class ConstantPathNode < Node
+	class Visitor < BasicVisitor
 	end
 end
