@@ -9,7 +9,7 @@ module Refract
 			define_method("visit_#{type}") do |node|
 				raise ArgumentError unless node_class === node
 				return_value = instance_exec(node, &)
-				raise ArgumentError unless NodeInstance === return_value
+				raise ArgumentError unless Node === return_value
 				return_value
 			end
 		end
@@ -45,13 +45,13 @@ module Refract
 
 		visit Prism::ArgumentsNode do |node|
 			ArgumentsNode.new(
-				arguments: node.arguments&.map { |n| visit(n) }
+				arguments: node.arguments&.map { |n| visit(n) },
 			)
 		end
 
 		visit Prism::ArrayNode do |node|
 			ArrayNode.new(
-				elements: node.elements&.map { |n| visit(n) }
+				elements: node.elements&.map { |n| visit(n) },
 			)
 		end
 
@@ -73,13 +73,13 @@ module Refract
 
 		visit Prism::AssocSplatNode do |node|
 			AssocSplatNode.new(
-				value: visit(node.value)
+				value: visit(node.value),
 			)
 		end
 
 		visit Prism::BackReferenceReadNode do |node|
 			BackReferenceReadNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
@@ -94,39 +94,39 @@ module Refract
 
 		visit Prism::BlockArgumentNode do |node|
 			BlockArgumentNode.new(
-				expression: visit(node.expression)
+				expression: visit(node.expression),
 			)
 		end
 
 		visit Prism::BlockLocalVariableNode do |node|
 			BlockLocalVariableNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::BlockNode do |node|
 			BlockNode.new(
 				parameters: visit(node.parameters),
-				body: visit(node.body)
+				body: visit(node.body),
 			)
 		end
 
 		visit Prism::BlockParameterNode do |node|
 			BlockParameterNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::BlockParametersNode do |node|
 			BlockParametersNode.new(
 				parameters: visit(node.parameters),
-				locals: node.locals&.map { |n| visit(n) }
+				locals: node.locals&.map { |n| visit(n) },
 			)
 		end
 
 		visit Prism::BreakNode do |node|
 			BreakNode.new(
-				arguments: visit(node.arguments)
+				arguments: visit(node.arguments),
 			)
 		end
 
@@ -134,7 +134,7 @@ module Refract
 			CallAndWriteNode.new(
 				receiver: visit(node.receiver),
 				read_name: node.read_name,
-				value: visit(node.value)
+				value: visit(node.value),
 			)
 		end
 
@@ -225,31 +225,51 @@ module Refract
 		end
 
 		visit Prism::ClassVariableReadNode do |node|
-			binding.irb
+			ClassVariableReadNode.new(
+				name: node.name,
+			)
 		end
 
 		visit Prism::ClassVariableTargetNode do |node|
-			binding.irb
+			ClassVariableTargetNode.new(
+				name: node.name,
+			)
 		end
 
 		visit Prism::ClassVariableWriteNode do |node|
-			binding.irb
+			ClassVariableWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::ConstantAndWriteNode do |node|
-			binding.irb
+			ConstantAndWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::ConstantOperatorWriteNode do |node|
-			binding.irb
+			ConstantOperatorWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+				binary_operator: node.binary_operator,
+			)
 		end
 
 		visit Prism::ConstantOrWriteNode do |node|
-			binding.irb
+			ConstantOrWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::ConstantPathAndWriteNode do |node|
-			binding.irb
+			ConstantPathAndWriteNode.new(
+				target: visit(node.target),
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::ConstantPathNode do |node|
@@ -260,33 +280,51 @@ module Refract
 		end
 
 		visit Prism::ConstantPathOperatorWriteNode do |node|
-			binding.irb
+			ConstantPathOperatorWriteNode.new(
+				target: visit(node.target),
+				value: visit(node.value),
+				binary_operator: node.binary_operator,
+			)
 		end
 
 		visit Prism::ConstantPathOrWriteNode do |node|
-			binding.irb
+			ConstantPathOrWriteNode.new(
+				target: visit(node.target),
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::ConstantPathTargetNode do |node|
-			binding.irb
+			ConstantPathTargetNode.new(
+				parent: visit(node.parent),
+				name: node.name,
+			)
 		end
 
 		visit Prism::ConstantPathWriteNode do |node|
-			binding.irb
+			ConstantPathWriteNode.new(
+				target: visit(node.target),
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::ConstantReadNode do |node|
 			ConstantReadNode.new(
-					name: node.name
+					name: node.name,
 				)
 		end
 
 		visit Prism::ConstantTargetNode do |node|
-			binding.irb
+			ConstantTargetNode.new(
+				name: node.name,
+			)
 		end
 
 		visit Prism::ConstantWriteNode do |node|
-			binding.irb
+			ConstantWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::DefNode do |node|
@@ -299,26 +337,32 @@ module Refract
 		end
 
 		visit Prism::DefinedNode do |node|
-			binding.irb
+			DefinedNode.new(
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::ElseNode do |node|
 			ElseNode.new(
-				statements: visit(node.statements)
+				statements: visit(node.statements),
 			)
 		end
 
 		visit Prism::EmbeddedStatementsNode do |node|
-			binding.irb
+			EmbeddedStatementsNode.new(
+				statements: visit(node.statements),
+			)
 		end
 
 		visit Prism::EmbeddedVariableNode do |node|
-			binding.irb
+			EmbeddedVariableNode.new(
+				variable: visit(node.variable),
+			)
 		end
 
 		visit Prism::EnsureNode do |node|
 			EnsureNode.new(
-				statements: visit(node.statements)
+				statements: visit(node.statements),
 			)
 		end
 
@@ -327,23 +371,38 @@ module Refract
 		end
 
 		visit Prism::FindPatternNode do |node|
-			binding.irb
+			FindPatternNode.new(
+				constant: visit(node.constant),
+				left: visit(node.left),
+				requireds: node.requireds.map { |n| visit(n) },
+				right: visit(node.right),
+			)
 		end
 
 		visit Prism::FlipFlopNode do |node|
-			binding.irb
+			FlipFlopNode.new(
+				left: visit(node.left),
+				right: visit(node.right),
+				exclude_end: node.exclude_end?,
+			)
 		end
 
 		visit Prism::FloatNode do |node|
-			binding.irb
+			FloatNode.new(
+				value: node.slice,
+			)
 		end
 
 		visit Prism::ForNode do |node|
-			binding.irb
+			ForNode.new(
+				index: visit(node.index),
+				collection: visit(node.collection),
+				statements: visit(node.statements),
+			)
 		end
 
 		visit Prism::ForwardingArgumentsNode do |node|
-			binding.irb
+			ForwardingArgumentsNode.new
 		end
 
 		visit Prism::ForwardingParameterNode do |node|
@@ -351,56 +410,82 @@ module Refract
 		end
 
 		visit Prism::ForwardingSuperNode do |node|
-			binding.irb
+			ForwardingSuperNode.new(
+				block: visit(node.block),
+			)
 		end
 
 		visit Prism::GlobalVariableAndWriteNode do |node|
-			binding.irb
+			GlobalVariableAndWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::GlobalVariableOperatorWriteNode do |node|
-			binding.irb
+			GlobalVariableOperatorWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+				binary_operator: node.binary_operator,
+			)
 		end
 
 		visit Prism::GlobalVariableOrWriteNode do |node|
-			binding.irb
+			GlobalVariableOrWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::GlobalVariableReadNode do |node|
 			GlobalVariableReadNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::GlobalVariableTargetNode do |node|
-			binding.irb
+			GlobalVariableTargetNode.new(
+				name: node.name,
+			)
 		end
 
 		visit Prism::GlobalVariableWriteNode do |node|
-			binding.irb
+			GlobalVariableWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::HashNode do |node|
 			HashNode.new(
-				elements: node.elements&.map { |n| visit(n) }
+				elements: node.elements&.map { |n| visit(n) },
 			)
 		end
 
 		visit Prism::HashPatternNode do |node|
-			binding.irb
+			HashPatternNode.new(
+				elements: node.elements&.map { |n| visit(n) },
+				rest: visit(node.rest),
+			)
 		end
 
 		visit Prism::IfNode do |node|
-			binding.irb
+			IfNode.new(
+				predicate: visit(node.predicate),
+				statements: visit(node.statements),
+				subsequent: visit(node.subsequent),
+			)
 		end
 
 		visit Prism::ImaginaryNode do |node|
-			binding.irb
+			ImaginaryNode.new(
+				numeric: visit(node.numeric),
+			)
 		end
 
 		visit Prism::ImplicitNode do |node|
 			ImplicitNode.new(
-				value: visit(node.value)
+				value: visit(node.value),
 			)
 		end
 
@@ -416,125 +501,184 @@ module Refract
 		end
 
 		visit Prism::IndexAndWriteNode do |node|
-			binding.irb
+			IndexAndWriteNode.new(
+				receiver: visit(node.receiver),
+				arguments: visit(node.arguments),
+				block: visit(node.block),
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::IndexOperatorWriteNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::IndexOrWriteNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::IndexTargetNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::InstanceVariableAndWriteNode do |node|
-			binding.irb
+			InstanceVariableAndWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::InstanceVariableOperatorWriteNode do |node|
-			binding.irb
+			InstanceVariableOperatorWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+				binary_operator: node.binary_operator,
+			)
 		end
 
 		visit Prism::InstanceVariableOrWriteNode do |node|
-			binding.irb
+			InstanceVariableOrWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::InstanceVariableReadNode do |node|
-			binding.irb
+			InstanceVariableReadNode.new(
+				name: node.name,
+			)
 		end
 
 		visit Prism::InstanceVariableTargetNode do |node|
-			binding.irb
+			InstanceVariableTargetNode.new(
+				name: node.name,
+			)
 		end
 
 		visit Prism::InstanceVariableWriteNode do |node|
-			binding.irb
+			InstanceVariableWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::IntegerNode do |node|
 			IntegerNode.new(
-				value: node.value
+				value: node.value,
 			)
 		end
 
 		visit Prism::InterpolatedMatchLastLineNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::InterpolatedRegularExpressionNode do |node|
-			binding.irb
+			InterpolatedRegularExpressionNode.new(
+				parts: node.parts.map { |part| visit(part) },
+				ignore_case: node.ignore_case?,
+				multi_line: node.multi_line?,
+				extended: node.extended?,
+				once: node.once?,
+			)
 		end
 
 		visit Prism::InterpolatedStringNode do |node|
-			binding.irb
+			InterpolatedStringNode.new(
+				parts: node.parts&.map { |n| visit(n) },
+			)
 		end
 
 		visit Prism::InterpolatedSymbolNode do |node|
-			binding.irb
+			InterpolatedSymbolNode.new(
+				parts: node.parts.map { |part| visit(part) },
+			)
 		end
 
 		visit Prism::InterpolatedXStringNode do |node|
-			binding.irb
+			InterpolatedXStringNode.new(
+				parts: node.parts.map { |part| visit(part) },
+			)
 		end
 
 		visit Prism::ItLocalVariableReadNode do |node|
-			binding.irb
+			ItLocalVariableReadNode.new
 		end
 
 		visit Prism::ItParametersNode do |node|
-			binding.irb
+			ItParametersNode.new
 		end
 
 		visit Prism::KeywordHashNode do |node|
 			KeywordHashNode.new(
-				elements: node.elements&.map { |n| visit(n) }
+				elements: node.elements&.map { |n| visit(n) },
 			)
 		end
 
 		visit Prism::KeywordRestParameterNode do |node|
 			KeywordRestParameterNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::LambdaNode do |node|
-			binding.irb
+			LambdaNode.new(
+				parameters: visit(node.parameters),
+				body: visit(node.body),
+			)
 		end
 
 		visit Prism::LocalVariableAndWriteNode do |node|
-			binding.irb
+			LocalVariableAndWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+				depth: node.depth,
+			)
 		end
 
 		visit Prism::LocalVariableOperatorWriteNode do |node|
-			binding.irb
+			LocalVariableOperatorWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+				binary_operator: node.binary_operator,
+				depth: node.depth,
+			)
 		end
 
 		visit Prism::LocalVariableOrWriteNode do |node|
-			binding.irb
+			LocalVariableOrWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+				depth: node.depth,
+			)
 		end
 
 		visit Prism::LocalVariableReadNode do |node|
 			LocalVariableReadNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::LocalVariableTargetNode do |node|
 			LocalVariableTargetNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::LocalVariableWriteNode do |node|
-			binding.irb
+			LocalVariableWriteNode.new(
+				name: node.name,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::MatchLastLineNode do |node|
-			binding.irb
+			MatchLastLineNode.new(
+				unescaped: node.unescaped,
+				ignore_case: node.ignore_case?,
+				multi_line: node.multi_line?,
+				extended: node.extended?,
+				once: node.once?,
+			)
 		end
 
 		visit Prism::MatchPredicateNode do |node|
@@ -552,19 +696,29 @@ module Refract
 		end
 
 		visit Prism::MatchWriteNode do |node|
-			binding.irb
+			MatchWriteNode.new(
+				call: visit(node.call),
+				targets: node.targets.map { |t| visit(t) },
+			)
 		end
 
 		visit Prism::MissingNode do |node|
-			binding.irb
+			MissingNode.new
 		end
 
 		visit Prism::ModuleNode do |node|
-			binding.irb
+			ModuleNode.new(
+				constant_path: visit(node.constant_path),
+				body: visit(node.body),
+			)
 		end
 
 		visit Prism::MultiTargetNode do |node|
-			binding.irb
+			MultiTargetNode.new(
+				lefts: node.lefts.map { |n| visit(n) },
+				rest: visit(node.rest),
+				rights: node.rights.map { |n| visit(n) },
+			)
 		end
 
 		visit Prism::MultiWriteNode do |node|
@@ -577,7 +731,9 @@ module Refract
 		end
 
 		visit Prism::NextNode do |node|
-			binding.irb
+			NextNode.new(
+				arguments: visit(node.arguments),
+			)
 		end
 
 		visit Prism::NilNode do |node|
@@ -585,15 +741,17 @@ module Refract
 		end
 
 		visit Prism::NoKeywordsParameterNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::NumberedParametersNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::NumberedReferenceReadNode do |node|
-			binding.irb
+			NumberedReferenceReadNode.new(
+				number: node.number,
+			)
 		end
 
 		visit Prism::OptionalKeywordParameterNode do |node|
@@ -611,7 +769,11 @@ module Refract
 		end
 
 		visit Prism::OrNode do |node|
-			binding.irb
+			OrNode.new(
+				left: visit(node.left),
+				operator: node.operator_loc.slice,
+				right: visit(node.right),
+			)
 		end
 
 		visit Prism::ParametersNode do |node|
@@ -622,28 +784,30 @@ module Refract
 				posts: node.posts&.map { |n| visit(n) },
 				keywords: node.keywords&.map { |n| visit(n) },
 				keyword_rest: visit(node.keyword_rest),
-				block: visit(node.block)
+				block: visit(node.block),
 			)
 		end
 
 		visit Prism::ParenthesesNode do |node|
-			binding.irb
+			ParenthesesNode.new(
+				body: visit(node.body),
+			)
 		end
 
 		visit Prism::PinnedExpressionNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::PinnedVariableNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::PostExecutionNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::PreExecutionNode do |node|
-			binding.irb
+			raise NoMethodError, "Not implemented"
 		end
 
 		visit Prism::ProgramNode do |node|
@@ -651,35 +815,51 @@ module Refract
 		end
 
 		visit Prism::RangeNode do |node|
-			binding.irb
+			RangeNode.new(
+				left: visit(node.left),
+				right: visit(node.right),
+				exclude_end: node.exclude_end?,
+			)
 		end
 
 		visit Prism::RationalNode do |node|
-			binding.irb
+			RationalNode.new(
+				numerator: node.numerator,
+				denominator: node.denominator,
+			)
 		end
 
 		visit Prism::RedoNode do |node|
-			binding.irb
+			RedoNode.new
 		end
 
 		visit Prism::RegularExpressionNode do |node|
-			binding.irb
+			RegularExpressionNode.new(
+				unescaped: node.unescaped,
+				ignore_case: node.ignore_case?,
+				multi_line: node.multi_line?,
+				extended: node.extended?,
+				once: node.once?,
+			)
 		end
 
 		visit Prism::RequiredKeywordParameterNode do |node|
 			RequiredKeywordParameterNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::RequiredParameterNode do |node|
 			RequiredParameterNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::RescueModifierNode do |node|
-			binding.irb
+			RescueModifierNode.new(
+				expression: visit(node.expression),
+				rescue_expression: visit(node.rescue_expression),
+			)
 		end
 
 		visit Prism::RescueNode do |node|
@@ -693,67 +873,77 @@ module Refract
 
 		visit Prism::RestParameterNode do |node|
 			RestParameterNode.new(
-				name: node.name
+				name: node.name,
 			)
 		end
 
 		visit Prism::RetryNode do |node|
-			binding.irb
+			RetryNode.new
 		end
 
 		visit Prism::ReturnNode do |node|
-			binding.irb
+			ReturnNode.new(
+				arguments: visit(node.arguments),
+			)
 		end
 
 		visit Prism::SelfNode do |node|
-			binding.irb
+			SelfNode.new
 		end
 
 		visit Prism::ShareableConstantNode do |node|
-			binding.irb
+			ShareableConstantNode.new(
+				write: visit(node.write),
+			)
 		end
 
 		visit Prism::SingletonClassNode do |node|
-			binding.irb
+			SingletonClassNode.new(
+				expression: visit(node.expression),
+				body: visit(node.body),
+			)
 		end
 
 		visit Prism::SourceEncodingNode do |node|
-			binding.irb
+			SourceEncodingNode.new
 		end
 
 		visit Prism::SourceFileNode do |node|
-			binding.irb
+			SourceFileNode.new
 		end
 
 		visit Prism::SourceLineNode do |node|
-			binding.irb
+			SourceLineNode.new
 		end
 
 		visit Prism::SplatNode do |node|
 			SplatNode.new(
-				expression: visit(node.expression)
+				expression: visit(node.expression),
 			)
 		end
 
 		visit Prism::StatementsNode do |node|
 			StatementsNode.new(
-				body: node.body&.map { |n| visit(n) }
+				body: node.body&.map { |n| visit(n) },
 			)
 		end
 
 		visit Prism::StringNode do |node|
 			StringNode.new(
-				unescaped: node.unescaped
+				unescaped: node.unescaped,
 			)
 		end
 
 		visit Prism::SuperNode do |node|
-			binding.irb
+			SuperNode.new(
+				arguments: visit(node.arguments),
+				block: visit(node.block),
+			)
 		end
 
 		visit Prism::SymbolNode do |node|
 			SymbolNode.new(
-				unescaped: node.unescaped
+				unescaped: node.unescaped,
 			)
 		end
 
@@ -762,15 +952,24 @@ module Refract
 		end
 
 		visit Prism::UndefNode do |node|
-			binding.irb
+			UndefNode.new(
+				names: node.names.map { |n| visit(n) },
+			)
 		end
 
 		visit Prism::UnlessNode do |node|
-			binding.irb
+			UnlessNode.new(
+				predicate: visit(node.predicate),
+				statements: visit(node.statements),
+				else_clause: visit(node.else_clause),
+			)
 		end
 
 		visit Prism::UntilNode do |node|
-			binding.irb
+			UntilNode.new(
+				predicate: visit(node.predicate),
+				statements: visit(node.statements),
+			)
 		end
 
 		visit Prism::WhenNode do |node|
@@ -781,15 +980,22 @@ module Refract
 		end
 
 		visit Prism::WhileNode do |node|
-			binding.irb
+			WhileNode.new(
+				predicate: visit(node.predicate),
+				statements: visit(node.statements),
+			)
 		end
 
 		visit Prism::XStringNode do |node|
-			binding.irb
+			XStringNode.new(
+				unescaped: node.unescaped,
+			)
 		end
 
 		visit Prism::YieldNode do |node|
-			binding.irb
+			YieldNode.new(
+				arguments: visit(node.arguments),
+			)
 		end
 	end
 end

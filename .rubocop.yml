@@ -1,5 +1,25 @@
 inherit_from:
   - "https://www.goodcop.style/tabs.yml"
 
+require:
+  - ./lib/rubocop/cop/refract_cops
+
 AllCops:
   TargetRubyVersion: 3.1
+
+Refract/OrderedVisitMethods:
+  Enabled: true
+  Include:
+    - "lib/refract/basic_visitor.rb"
+    - "lib/refract/converter.rb"
+    - "lib/refract/formatter.rb"
+    - "lib/refract/mutation_visitor.rb"
+    - "lib/refract/visitor.rb"
+
+Style/VariableInterpolation:
+  Enabled: false
+
+Style/TrailingCommaInArguments:
+  Enabled: true
+  EnforcedStyleForMultiline: comma
+  AutoCorrect: always

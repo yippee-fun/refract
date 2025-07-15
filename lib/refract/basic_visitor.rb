@@ -7,7 +7,7 @@ module Refract
 		end
 
 		def self.visit(node_class, &)
-			define_method("visit_#{node_class.snake_case_name}", &)
+			define_method("visit_#{node_class.type}", &)
 		end
 
 		def visit(node)
