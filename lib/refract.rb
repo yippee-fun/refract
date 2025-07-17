@@ -35,7 +35,7 @@ module Refract
 
 		def update(**props)
 			props.each do |k, v|
-				self[k] = v
+				public_send("#{k}=", v)
 			end
 		end
 	end
