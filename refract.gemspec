@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
 	spec.authors = ["Joel Drapper"]
 	spec.email = ["joel@drapper.me"]
 
-	spec.summary = "Refract"
-	spec.description = "Refract"
+	spec.summary = "Ruby code rewriter."
+	spec.description = spec.summary
 	spec.homepage = "https://github.com/yippee-fun/refract"
 	spec.license = "MIT"
 	spec.required_ruby_version = ">= 3.1"
