@@ -674,6 +674,19 @@ module Refract
 			push node.value.to_s
 		end
 
+		visit InterpolatedMatchLastLineNode do |node|
+			push "/"
+			node.parts.each do |part|
+				case part
+				when StringNode
+					push part.unescaped.gsub("/", "\\/")
+				else
+					visit part
+				end
+			end
+			push "/"
+		end
+
 		visit InterpolatedRegularExpressionNode do |node|
 			push "/"
 			node.parts.each do |part|

@@ -505,6 +505,12 @@ module Refract
 			node
 		end
 
+		visit InterpolatedMatchLastLineNode do |node|
+			node.update(
+				parts: node.parts.map { |n| visit(n) },
+			)
+		end
+
 		visit InterpolatedRegularExpressionNode do |node|
 			node.update(
 				parts: node.parts&.map { |n| visit(n) },

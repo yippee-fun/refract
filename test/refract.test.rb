@@ -946,6 +946,13 @@ test "index target node" do
 	RUBY
 end
 
+test "interpolated match last line" do
+	assert_refract <<~RUBY
+		if /foo \#{bar} baz/
+		end
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)

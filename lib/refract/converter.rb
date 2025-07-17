@@ -584,7 +584,13 @@ module Refract
 		end
 
 		visit Prism::InterpolatedMatchLastLineNode do |node|
-			raise NoMethodError, "Not implemented"
+			InterpolatedMatchLastLineNode.new(
+				parts: node.parts&.map { |n| visit(n) },
+				ignore_case: node.ignore_case?,
+				multi_line: node.multi_line?,
+				extended: node.extended?,
+				once: node.once?,
+			)
 		end
 
 		visit Prism::InterpolatedRegularExpressionNode do |node|

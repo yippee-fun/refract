@@ -381,6 +381,10 @@ module Refract
 			nil
 		end
 
+		visit InterpolatedMatchLastLineNode do |node|
+			visit_each node.parts
+		end
+
 		visit InterpolatedRegularExpressionNode do |node|
 			visit_each node.parts
 		end
