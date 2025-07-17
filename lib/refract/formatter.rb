@@ -606,7 +606,7 @@ module Refract
 		visit IndexAndWriteNode do |node|
 			visit node.receiver
 			push "["
-			visit_each([*node.arguments, node.block]) { push ", " }
+			visit_each([node.arguments, node.block]) { push ", " }
 			push "] &&= "
 			visit node.value
 		end
@@ -614,7 +614,7 @@ module Refract
 		visit IndexOperatorWriteNode do |node|
 			visit node.receiver
 			push "["
-			visit_each([*node.arguments, node.block]) { push ", " }
+			visit_each([node.arguments, node.block]) { push ", " }
 			push "] "
 			push node.binary_operator
 			push "= "
@@ -624,9 +624,16 @@ module Refract
 		visit IndexOrWriteNode do |node|
 			visit node.receiver
 			push "["
-			visit_each([*node.arguments, node.block]) { push ", " }
+			visit_each([node.arguments, node.block]) { push ", " }
 			push "] ||= "
 			visit node.value
+		end
+
+		visit IndexTargetNode do |node|
+			visit node.receiver
+			push "["
+			visit_each([node.arguments, node.block]) { push ", " }
+			push "]"
 		end
 
 		visit InstanceVariableAndWriteNode do |node|

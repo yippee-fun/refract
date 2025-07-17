@@ -940,6 +940,12 @@ test "index or write" do
 	RUBY
 end
 
+test "index target node" do
+	assert_refract <<~RUBY
+		foo[bar], = 1
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)

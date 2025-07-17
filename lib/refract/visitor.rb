@@ -347,6 +347,12 @@ module Refract
 			visit node.value
 		end
 
+		visit IndexTargetNode do |node|
+			visit node.receiver
+			visit node.arguments
+			visit node.block
+		end
+
 		visit InstanceVariableAndWriteNode do |node|
 			visit node.value
 		end

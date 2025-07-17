@@ -461,6 +461,14 @@ module Refract
 			)
 		end
 
+		visit IndexTargetNode do |node|
+			node.update(
+				receiver: visit(node.receiver),
+				arguments: visit(node.arguments),
+				block: visit(node.block),
+			)
+		end
+
 		visit InstanceVariableAndWriteNode do |node|
 			node.update(
 				value: visit(node.value),
