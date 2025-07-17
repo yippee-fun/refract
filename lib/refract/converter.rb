@@ -762,7 +762,7 @@ module Refract
 		end
 
 		visit Prism::NoKeywordsParameterNode do |node|
-			raise NoMethodError, "Not implemented"
+			NoKeywordsParameterNode.new
 		end
 
 		visit Prism::NumberedParametersNode do |node|

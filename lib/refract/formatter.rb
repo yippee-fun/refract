@@ -878,6 +878,10 @@ module Refract
 			push "nil"
 		end
 
+		visit NoKeywordsParameterNode do |node|
+			push "**nil"
+		end
+
 		visit NumberedReferenceReadNode do |node|
 			push "$#{node.number}"
 		end

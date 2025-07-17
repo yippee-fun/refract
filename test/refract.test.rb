@@ -953,6 +953,13 @@ test "interpolated match last line" do
 	RUBY
 end
 
+test "no keywords parameter node" do
+	assert_refract <<~RUBY
+		def a(**nil)
+		end
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)

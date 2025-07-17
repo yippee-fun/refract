@@ -495,6 +495,10 @@ module Refract
 			nil
 		end
 
+		visit NoKeywordsParameterNode do |node|
+			nil
+		end
+
 		visit NumberedReferenceReadNode do |node|
 			nil
 		end

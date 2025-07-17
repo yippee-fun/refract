@@ -655,6 +655,10 @@ module Refract
 			node
 		end
 
+		visit NoKeywordsParameterNode do |node|
+			node
+		end
+
 		visit NumberedReferenceReadNode do |node|
 			node
 		end
