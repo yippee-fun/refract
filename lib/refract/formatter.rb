@@ -930,6 +930,11 @@ module Refract
 			push ")"
 		end
 
+		visit PinnedVariableNode do |node|
+			push "^"
+			visit node.variable
+		end
+
 		visit RangeNode do |node|
 			visit node.left
 			push node.exclude_end ? "..." : ".."

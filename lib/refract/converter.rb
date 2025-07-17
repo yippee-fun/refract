@@ -822,7 +822,9 @@ module Refract
 		end
 
 		visit Prism::PinnedVariableNode do |node|
-			raise NoMethodError, "Not implemented"
+			PinnedVariableNode.new(
+				variable: visit(node.variable),
+			)
 		end
 
 		visit Prism::PostExecutionNode do |node|

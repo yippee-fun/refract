@@ -966,6 +966,12 @@ test "pinned expression" do
 	RUBY
 end
 
+test "pinned variable" do
+	assert_refract <<~RUBY
+		foo in ^bar
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)
