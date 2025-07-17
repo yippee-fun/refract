@@ -988,6 +988,14 @@ test "post execution" do
 	RUBY
 end
 
+test "pre execution" do
+	assert_refract <<~RUBY
+		BEGIN {
+			foo
+		}
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)

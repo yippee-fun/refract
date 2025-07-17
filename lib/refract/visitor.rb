@@ -546,6 +546,10 @@ module Refract
 			visit node.statements
 		end
 
+		visit PreExecutionNode do |node|
+			visit node.statements
+		end
+
 		visit ProgramNode do |node|
 			visit node.statements
 		end

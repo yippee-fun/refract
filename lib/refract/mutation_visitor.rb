@@ -722,6 +722,12 @@ module Refract
 			)
 		end
 
+		visit PreExecutionNode do |node|
+			node.update(
+				statements: visit(node.statements),
+			)
+		end
+
 		visit ProgramNode do |node|
 			node.update(
 				statements: visit(node.statements),

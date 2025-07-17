@@ -963,6 +963,15 @@ module Refract
 			push "}"
 		end
 
+		visit PreExecutionNode do |node|
+			push "BEGIN {"
+			indent do
+				visit node.statements
+			end
+			new_line
+			push "}"
+		end
+
 		visit ProgramNode do |node|
 			visit node.statements
 		end
