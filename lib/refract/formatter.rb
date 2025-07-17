@@ -924,6 +924,12 @@ module Refract
 			end
 		end
 
+		visit PinnedExpressionNode do |node|
+			push "^("
+			visit node.expression
+			push ")"
+		end
+
 		visit RangeNode do |node|
 			visit node.left
 			push node.exclude_end ? "..." : ".."

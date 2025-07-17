@@ -700,6 +700,12 @@ module Refract
 			)
 		end
 
+		visit PinnedExpressionNode do |node|
+			node.update(
+			expression: visit(node.expression),
+		)
+		end
+
 		visit RangeNode do |node|
 			node.update(
 				left: visit(node.left),

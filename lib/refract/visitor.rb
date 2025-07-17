@@ -530,6 +530,10 @@ module Refract
 			visit node.body
 		end
 
+		visit PinnedExpressionNode do |node|
+			visit node.expression
+		end
+
 		visit RangeNode do |node|
 			visit node.left
 			visit node.right

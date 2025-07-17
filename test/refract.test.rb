@@ -953,10 +953,16 @@ test "interpolated match last line" do
 	RUBY
 end
 
-test "no keywords parameter node" do
+test "no keywords parameter" do
 	assert_refract <<~RUBY
 		def a(**nil)
 		end
+	RUBY
+end
+
+test "pinned expression" do
+	assert_refract <<~RUBY
+		foo in ^(bar)
 	RUBY
 end
 

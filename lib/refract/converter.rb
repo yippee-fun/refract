@@ -816,7 +816,9 @@ module Refract
 		end
 
 		visit Prism::PinnedExpressionNode do |node|
-			raise NoMethodError, "Not implemented"
+			PinnedExpressionNode.new(
+				expression: visit(node.expression),
+			)
 		end
 
 		visit Prism::PinnedVariableNode do |node|
