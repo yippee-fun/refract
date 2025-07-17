@@ -621,6 +621,14 @@ module Refract
 			visit node.value
 		end
 
+		visit IndexOrWriteNode do |node|
+			visit node.receiver
+			push "["
+			visit_each([*node.arguments, node.block]) { push ", " }
+			push "] ||= "
+			visit node.value
+		end
+
 		visit InstanceVariableAndWriteNode do |node|
 			push node.name
 			push " &&= "

@@ -520,7 +520,12 @@ module Refract
 		end
 
 		visit Prism::IndexOrWriteNode do |node|
-			raise NoMethodError, "Not implemented"
+			IndexOrWriteNode.new(
+				receiver: visit(node.receiver),
+				arguments: visit(node.arguments),
+				block: visit(node.block),
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::IndexTargetNode do |node|
