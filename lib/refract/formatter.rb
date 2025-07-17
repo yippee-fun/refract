@@ -130,10 +130,10 @@ module Refract
 		visit BlockNode do |node|
 			braces do
 				case node.parameters
-				when ItParametersNode
-					visit node.parameters
 				when nil
 					nil
+				when ItParametersNode, NumberedParametersNode
+					visit node.parameters
 				else
 					space
 					pipes do
@@ -768,7 +768,12 @@ module Refract
 		visit LambdaNode do |node|
 			push "->"
 
-			if node.parameters
+			case node.parameters
+			when nil
+				nil
+			when ItParametersNode, NumberedParametersNode
+				visit node.parameters
+			else
 				space
 
 				parens do
@@ -890,6 +895,10 @@ module Refract
 
 		visit NoKeywordsParameterNode do |node|
 			push "**nil"
+		end
+
+		visit NumberedParametersNode do |node|
+			nil
 		end
 
 		visit NumberedReferenceReadNode do |node|

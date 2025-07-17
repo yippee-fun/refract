@@ -972,6 +972,14 @@ test "pinned variable" do
 	RUBY
 end
 
+test "numbered parameters" do
+	assert_refract <<~RUBY
+		-> {
+			_1.+(_2)
+		}
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)

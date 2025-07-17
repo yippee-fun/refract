@@ -766,7 +766,7 @@ module Refract
 		end
 
 		visit Prism::NumberedParametersNode do |node|
-			raise NoMethodError, "Not implemented"
+			NumberedParametersNode.new
 		end
 
 		visit Prism::NumberedReferenceReadNode do |node|
