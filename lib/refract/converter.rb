@@ -828,7 +828,9 @@ module Refract
 		end
 
 		visit Prism::PostExecutionNode do |node|
-			raise NoMethodError, "Not implemented"
+			PostExecutionNode.new(
+				statements: visit(node.statements),
+			)
 		end
 
 		visit Prism::PreExecutionNode do |node|

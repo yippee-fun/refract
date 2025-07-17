@@ -980,6 +980,14 @@ test "numbered parameters" do
 	RUBY
 end
 
+test "post execution" do
+	assert_refract <<~RUBY
+		END {
+			foo
+		}
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)

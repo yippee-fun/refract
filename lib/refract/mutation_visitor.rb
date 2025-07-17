@@ -716,6 +716,12 @@ module Refract
 			)
 		end
 
+		visit PostExecutionNode do |node|
+			node.update(
+				statements: visit(node.statements),
+			)
+		end
+
 		visit ProgramNode do |node|
 			node.update(
 				statements: visit(node.statements),

@@ -954,6 +954,15 @@ module Refract
 			visit node.variable
 		end
 
+		visit PostExecutionNode do |node|
+			push "END {"
+			indent do
+				visit node.statements
+			end
+			new_line
+			push "}"
+		end
+
 		visit ProgramNode do |node|
 			visit node.statements
 		end
