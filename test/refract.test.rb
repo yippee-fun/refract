@@ -227,7 +227,7 @@ test "lambda" do
 	RUBY
 
 	assert_refract <<~RUBY
-		lambda { |x, y|
+		-> (x, y) {
 			x.+(y)
 		}
 	RUBY

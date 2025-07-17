@@ -129,9 +129,16 @@ module Refract
 
 		visit BlockNode do |node|
 			braces do
-				if node.parameters
-					space unless ItParametersNode === node.parameters
+				case node.parameters
+				when ItParametersNode
 					visit node.parameters
+				when nil
+					nil
+				else
+					space
+					pipes do
+						visit node.parameters
+					end
 				end
 
 				indent do
@@ -148,13 +155,11 @@ module Refract
 		end
 
 		visit BlockParametersNode do |node|
-			pipes do
-				visit node.parameters
+			visit node.parameters
 
-				if node.locals&.any?
-					push "; "
-					visit_each(node.locals) { push ", " }
-				end
+			if node.locals&.any?
+				push "; "
+				visit_each(node.locals) { push ", " }
 			end
 		end
 
@@ -761,14 +766,19 @@ module Refract
 		end
 
 		visit LambdaNode do |node|
-			push "lambda"
-			space
-			braces do
-				if node.parameters
-					space
+			push "->"
+
+			if node.parameters
+				space
+
+				parens do
 					visit node.parameters
 				end
+			end
 
+			space
+
+			braces do
 				indent do
 					visit node.body
 				end
