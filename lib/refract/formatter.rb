@@ -954,6 +954,10 @@ module Refract
 			visit node.variable
 		end
 
+		visit ProgramNode do |node|
+			visit node.statements
+		end
+
 		visit RangeNode do |node|
 			visit node.left
 			push node.exclude_end ? "..." : ".."

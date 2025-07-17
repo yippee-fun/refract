@@ -542,6 +542,10 @@ module Refract
 			visit node.variable
 		end
 
+		visit ProgramNode do |node|
+			visit node.statements
+		end
+
 		visit RangeNode do |node|
 			visit node.left
 			visit node.right
@@ -554,10 +558,6 @@ module Refract
 		visit RedoNode do |node|
 			nil
 		end
-
-		# visit ProgramNode do |node|
-		# 	visit(node.statements)
-		# end
 
 		visit RegularExpressionNode do |node|
 			nil

@@ -716,6 +716,12 @@ module Refract
 			)
 		end
 
+		visit ProgramNode do |node|
+			node.update(
+				statements: visit(node.statements),
+			)
+		end
+
 		visit RangeNode do |node|
 			node.update(
 				left: visit(node.left),
@@ -730,10 +736,6 @@ module Refract
 		visit RedoNode do |node|
 			node
 		end
-
-		# visit ProgramNode do |node|
-		# 	visit(node.statements)
-		# end
 
 		visit RegularExpressionNode do |node|
 			node

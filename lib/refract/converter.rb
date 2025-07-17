@@ -836,7 +836,9 @@ module Refract
 		end
 
 		visit Prism::ProgramNode do |node|
-			visit(node.statements)
+			ProgramNode.new(
+				statements: visit(node.statements),
+			)
 		end
 
 		visit Prism::RangeNode do |node|
