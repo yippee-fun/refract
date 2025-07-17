@@ -333,6 +333,13 @@ module Refract
 			visit node.value
 		end
 
+		visit IndexOperatorWriteNode do |node|
+			visit node.receiver
+			visit node.arguments
+			visit node.block
+			visit node.value
+		end
+
 		visit InstanceVariableAndWriteNode do |node|
 			visit node.value
 		end

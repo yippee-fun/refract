@@ -474,7 +474,7 @@ test "back reference read" do
 	RUBY
 end
 
-test "begin node" do
+test "begin" do
 	assert_refract <<~RUBY
 		begin
 			a
@@ -901,7 +901,7 @@ test "range" do
 	RUBY
 end
 
-test "hash pattern node" do
+test "hash pattern" do
 	assert_refract <<~RUBY
 		foo => { a: 1, b: 2 }
 	RUBY
@@ -918,13 +918,19 @@ test "match last line" do
 	RUBY
 end
 
-test "index and write node" do
+test "index and write" do
 	assert_refract <<~RUBY
 		foo.bar[baz] &&= value
 	RUBY
 
 	assert_refract <<~RUBY
 		foo[bar, &foo] &&= baz
+	RUBY
+end
+
+test "index operator write" do
+	assert_refract <<~RUBY
+		foo.bar[baz] += value
 	RUBY
 end
 

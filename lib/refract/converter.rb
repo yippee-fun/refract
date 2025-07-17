@@ -510,7 +510,13 @@ module Refract
 		end
 
 		visit Prism::IndexOperatorWriteNode do |node|
-			raise NoMethodError, "Not implemented"
+			IndexOperatorWriteNode.new(
+				receiver: visit(node.receiver),
+				arguments: visit(node.arguments),
+				block: visit(node.block),
+				binary_operator: node.binary_operator,
+				value: visit(node.value),
+			)
 		end
 
 		visit Prism::IndexOrWriteNode do |node|

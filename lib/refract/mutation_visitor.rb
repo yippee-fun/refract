@@ -443,6 +443,15 @@ module Refract
 			)
 		end
 
+		visit IndexOperatorWriteNode do |node|
+			node.update(
+				receiver: visit(node.receiver),
+				arguments: visit(node.arguments),
+				block: visit(node.block),
+				value: visit(node.value),
+			)
+		end
+
 		visit InstanceVariableAndWriteNode do |node|
 			node.update(
 				value: visit(node.value),
