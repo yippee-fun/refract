@@ -2,7 +2,8 @@
 
 module Refract
 	class InterpolatedXStringNode < Node
-		def initialize(parts:)
+		def initialize(prism_node: nil, parts:)
+			@prism_node = prism_node => Prism::Node | nil
 			@parts = parts
 		end
 

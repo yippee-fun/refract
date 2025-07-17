@@ -2,7 +2,8 @@
 
 module Refract
 	class BlockNode < Node
-		def initialize(parameters:, body:)
+		def initialize(prism_node: nil, parameters:, body:)
+			@prism_node = prism_node => Prism::Node | nil
 			@parameters = parameters
 			@body = body
 		end

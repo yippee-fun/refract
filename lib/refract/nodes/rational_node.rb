@@ -2,7 +2,8 @@
 
 module Refract
 	class RationalNode < Node
-		def initialize(numerator:, denominator:)
+		def initialize(prism_node: nil, numerator:, denominator:)
+			@prism_node = prism_node => Prism::Node | nil
 			@numerator = numerator
 			@denominator = denominator
 		end

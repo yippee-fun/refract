@@ -2,7 +2,8 @@
 
 module Refract
 	class AliasGlobalVariableNode < Node
-		def initialize(new_name:, old_name:)
+		def initialize(prism_node: nil, new_name:, old_name:)
+			@prism_node = prism_node => Prism::Node | nil
 			@new_name = new_name => GlobalVariableReadNode
 			@old_name = old_name => GlobalVariableReadNode
 		end

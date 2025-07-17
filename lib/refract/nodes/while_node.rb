@@ -2,7 +2,8 @@
 
 module Refract
 	class WhileNode < Node
-		def initialize(predicate:, statements:)
+		def initialize(prism_node: nil, predicate:, statements:)
+			@prism_node = prism_node => Prism::Node | nil
 			@predicate = predicate
 			@statements = statements
 		end

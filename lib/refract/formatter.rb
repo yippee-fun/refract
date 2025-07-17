@@ -10,8 +10,17 @@ module Refract
 			@indent = 0
 		end
 
+		def around_visit(node)
+			if (start_line = node.start_line)
+				@source_map[@current_line] = start_line
+			end
+
+			super
+		end
+
 		def format_node(node)
 			visit(node)
+			puts @source_map.inspect
 			@buffer.join
 		end
 
@@ -1218,7 +1227,8 @@ module Refract
 		end
 
 		private def new_line
-			push "\n#{"\t" * @indent}"
+			@buffer << "\n#{"\t" * @indent}"
+			@current_line += 1
 		end
 
 		private def indent

@@ -2,7 +2,8 @@
 
 module Refract
 	class CapturePatternNode < Node
-		def initialize(value:, target:)
+		def initialize(prism_node: nil, value:, target:)
+			@prism_node = prism_node => Prism::Node | nil
 			@value = value
 			@target = target
 		end

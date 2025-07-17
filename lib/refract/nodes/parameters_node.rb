@@ -2,7 +2,8 @@
 
 module Refract
 	class ParametersNode < Node
-		def initialize(requireds:, optionals:, rest:, posts:, keywords:, keyword_rest:, block:)
+		def initialize(prism_node: nil, requireds:, optionals:, rest:, posts:, keywords:, keyword_rest:, block:)
+			@prism_node = prism_node => Prism::Node | nil
 			@requireds = requireds
 			@optionals = optionals
 			@rest = rest

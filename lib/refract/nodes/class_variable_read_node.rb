@@ -2,7 +2,8 @@
 
 module Refract
 	class ClassVariableReadNode < Node
-		def initialize(name:)
+		def initialize(prism_node: nil, name:)
+			@prism_node = prism_node => Prism::Node | nil
 			@name = name
 		end
 

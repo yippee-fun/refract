@@ -2,7 +2,8 @@
 
 module Refract
 	class CallTargetNode < Node
-		def initialize(receiver:, name:)
+		def initialize(prism_node: nil, receiver:, name:)
+			@prism_node = prism_node => Prism::Node | nil
 			@receiver = receiver
 			@name = name
 		end

@@ -2,7 +2,8 @@
 
 module Refract
 	class FindPatternNode < Node
-		def initialize(constant:, left:, requireds:, right:)
+		def initialize(prism_node: nil, constant:, left:, requireds:, right:)
+			@prism_node = prism_node => Prism::Node | nil
 			@constant = constant
 			@left = left
 			@requireds = requireds

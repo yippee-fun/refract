@@ -2,7 +2,8 @@
 
 module Refract
 	class ProgramNode < Node
-		def initialize(statements:)
+		def initialize(prism_node: nil, statements:)
+			@prism_node = prism_node => Prism::Node | nil
 			@statements = statements
 		end
 

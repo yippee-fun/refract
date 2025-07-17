@@ -2,7 +2,8 @@
 
 module Refract
 	class ShareableConstantNode < Node
-		def initialize(write:)
+		def initialize(prism_node: nil, write:)
+			@prism_node = prism_node => Prism::Node | nil
 			@write = write
 		end
 

@@ -2,7 +2,8 @@
 
 module Refract
 	class ImplicitNode < Node
-		def initialize(value:)
+		def initialize(prism_node: nil, value:)
+			@prism_node = prism_node => Prism::Node | nil
 			@value = value
 		end
 

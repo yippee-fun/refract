@@ -2,7 +2,8 @@
 
 module Refract
 	class ParenthesesNode < Node
-		def initialize(body:)
+		def initialize(prism_node: nil, body:)
+			@prism_node = prism_node => Prism::Node | nil
 			@body = body
 		end
 

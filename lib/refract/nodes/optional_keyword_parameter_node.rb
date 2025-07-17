@@ -2,7 +2,8 @@
 
 module Refract
 	class OptionalKeywordParameterNode < Node
-		def initialize(name:, value:)
+		def initialize(prism_node: nil, name:, value:)
+			@prism_node = prism_node => Prism::Node | nil
 			@name = name
 			@value = value
 		end

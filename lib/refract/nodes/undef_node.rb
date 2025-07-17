@@ -2,7 +2,8 @@
 
 module Refract
 	class UndefNode < Node
-		def initialize(names:)
+		def initialize(prism_node: nil, names:)
+			@prism_node = prism_node => Prism::Node | nil
 			@names = names
 		end
 

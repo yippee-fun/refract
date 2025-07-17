@@ -2,7 +2,8 @@
 
 module Refract
 	class GlobalVariableOperatorWriteNode < Node
-		def initialize(name:, value:, binary_operator:)
+		def initialize(prism_node: nil, name:, value:, binary_operator:)
+			@prism_node = prism_node => Prism::Node | nil
 			@name = name
 			@value = value
 			@binary_operator = binary_operator

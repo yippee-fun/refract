@@ -2,7 +2,8 @@
 
 module Refract
 	class RescueNode < Node
-		def initialize(exceptions:, reference:, statements:, subsequent:)
+		def initialize(prism_node: nil, exceptions:, reference:, statements:, subsequent:)
+			@prism_node = prism_node => Prism::Node | nil
 			@exceptions = exceptions
 			@reference = reference
 			@statements = statements

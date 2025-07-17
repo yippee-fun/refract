@@ -2,7 +2,8 @@
 
 module Refract
 	class RangeNode < Node
-		def initialize(left:, right:, exclude_end:)
+		def initialize(prism_node: nil, left:, right:, exclude_end:)
+			@prism_node = prism_node => Prism::Node | nil
 			@left = left
 			@right = right
 			@exclude_end = exclude_end

@@ -2,7 +2,8 @@
 
 module Refract
 	class CallOperatorWriteNode < Node
-		def initialize(receiver:, read_name:, binary_operator:, value:)
+		def initialize(prism_node: nil, receiver:, read_name:, binary_operator:, value:)
+			@prism_node = prism_node => Prism::Node | nil
 			@receiver = receiver
 			@read_name = read_name
 			@binary_operator = binary_operator

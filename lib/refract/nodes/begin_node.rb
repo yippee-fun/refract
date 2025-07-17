@@ -2,7 +2,8 @@
 
 module Refract
 	class BeginNode < Node
-		def initialize(statements:, rescue_clause:, else_clause:, ensure_clause:)
+		def initialize(prism_node: nil, statements:, rescue_clause:, else_clause:, ensure_clause:)
+			@prism_node = prism_node => Prism::Node | nil
 			@statements = statements
 			@rescue_clause = rescue_clause
 			@else_clause = else_clause

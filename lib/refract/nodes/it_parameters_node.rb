@@ -2,5 +2,8 @@
 
 module Refract
 	class ItParametersNode < Node
+		def initialize(prism_node: nil)
+			@prism_node = prism_node => Prism::Node | nil
+		end
 	end
 end

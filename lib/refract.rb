@@ -33,6 +33,10 @@ module Refract
 			accept(visitor)
 		end
 
+		def start_line
+			@prism_node&.location&.start_line
+		end
+
 		def update(**props)
 			props.each do |k, v|
 				public_send("#{k}=", v)

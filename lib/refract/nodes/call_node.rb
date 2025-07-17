@@ -2,7 +2,8 @@
 
 module Refract
 	class CallNode < Node
-		def initialize(receiver:, message:, arguments:, block:)
+		def initialize(prism_node: nil, receiver:, message:, arguments:, block:)
+			@prism_node = prism_node => Prism::Node | nil
 			@receiver = receiver
 			@message = message
 			@arguments = arguments

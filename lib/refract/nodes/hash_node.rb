@@ -2,7 +2,8 @@
 
 module Refract
 	class HashNode < Node
-		def initialize(elements:)
+		def initialize(prism_node: nil, elements:)
+			@prism_node = prism_node => Prism::Node | nil
 			@elements = elements
 		end
 

@@ -2,7 +2,8 @@
 
 module Refract
 	class CaseMatchNode < Node
-		def initialize(predicate:, conditions:, else_clause:)
+		def initialize(prism_node: nil, predicate:, conditions:, else_clause:)
+			@prism_node = prism_node => Prism::Node | nil
 			@predicate = predicate
 			@conditions = conditions
 			@else_clause = else_clause

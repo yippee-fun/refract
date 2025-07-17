@@ -2,7 +2,8 @@
 
 module Refract
 	class IndexOperatorWriteNode < Node
-		def initialize(receiver:, arguments:, block:, binary_operator:, value:)
+		def initialize(prism_node: nil, receiver:, arguments:, block:, binary_operator:, value:)
+			@prism_node = prism_node => Prism::Node | nil
 			@receiver = receiver
 			@arguments = arguments
 			@block = block

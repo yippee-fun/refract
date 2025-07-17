@@ -2,7 +2,8 @@
 
 module Refract
 	class MultiTargetNode < Node
-		def initialize(lefts:, rest:, rights:)
+		def initialize(prism_node: nil, lefts:, rest:, rights:)
+			@prism_node = prism_node => Prism::Node | nil
 			@lefts = lefts
 			@rest = rest
 			@rights = rights

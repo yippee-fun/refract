@@ -2,7 +2,8 @@
 
 module Refract
 	class ArrayPatternNode < Node
-		def initialize(constant:, requireds:, rest:, posts:)
+		def initialize(prism_node: nil, constant:, requireds:, rest:, posts:)
+			@prism_node = prism_node => Prism::Node | nil
 			@constant = constant
 			@requireds = requireds
 			@rest = rest
