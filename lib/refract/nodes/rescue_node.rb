@@ -8,6 +8,7 @@ module Refract
 			@reference = reference
 			@statements = statements
 			@subsequent = subsequent
+			freeze
 		end
 
 		attr_accessor :exceptions, :reference, :statements, :subsequent

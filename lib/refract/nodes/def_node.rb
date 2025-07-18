@@ -8,6 +8,7 @@ module Refract
 			@receiver = receiver
 			@parameters = parameters
 			@body = body
+			freeze
 		end
 
 		attr_accessor :name, :receiver, :parameters, :body

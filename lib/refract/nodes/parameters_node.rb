@@ -11,6 +11,7 @@ module Refract
 			@keywords = keywords
 			@keyword_rest = keyword_rest
 			@block = block
+			freeze
 		end
 
 		attr_accessor :requireds, :optionals, :rest, :posts, :keywords, :keyword_rest, :block

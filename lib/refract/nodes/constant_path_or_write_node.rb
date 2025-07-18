@@ -6,6 +6,7 @@ module Refract
 			@prism_node = prism_node => Prism::Node | nil
 			@target = target
 			@value = value
+			freeze
 		end
 
 		attr_accessor :target, :value

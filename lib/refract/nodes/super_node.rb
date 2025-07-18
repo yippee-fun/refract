@@ -6,6 +6,7 @@ module Refract
 			@prism_node = prism_node => Prism::Node | nil
 			@arguments = arguments
 			@block = block
+			freeze
 		end
 
 		attr_accessor :arguments, :block

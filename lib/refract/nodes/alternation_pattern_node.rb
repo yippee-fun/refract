@@ -6,6 +6,7 @@ module Refract
 			@prism_node = prism_node => Prism::Node | nil
 			@left = left
 			@right = right
+			freeze
 		end
 
 		attr_accessor :left, :right

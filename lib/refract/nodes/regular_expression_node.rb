@@ -9,6 +9,7 @@ module Refract
 			@multi_line = multi_line
 			@extended = extended
 			@once = once
+			freeze
 		end
 
 		attr_accessor :unescaped, :ignore_case, :multi_line, :extended, :once

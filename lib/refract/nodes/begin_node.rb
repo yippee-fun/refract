@@ -8,6 +8,7 @@ module Refract
 			@rescue_clause = rescue_clause
 			@else_clause = else_clause
 			@ensure_clause = ensure_clause
+			freeze
 		end
 
 		attr_accessor :statements, :rescue_clause, :else_clause, :ensure_clause

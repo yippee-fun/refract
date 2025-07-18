@@ -6,6 +6,7 @@ module Refract
 			@prism_node = prism_node => Prism::Node | nil
 			@pattern = pattern
 			@statements = statements
+			freeze
 		end
 
 		attr_accessor :pattern, :statements

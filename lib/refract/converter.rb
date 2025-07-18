@@ -42,7 +42,7 @@ module Refract
 			AndNode.new(
 				prism_node: node,
 				left: visit(node.left),
-				operator: node.operator_loc.slice,
+				operator: node.operator,
 				right: visit(node.right),
 			)
 		end
@@ -160,7 +160,7 @@ module Refract
 			CallNode.new(
 				prism_node: node,
 				receiver: visit(node.receiver),
-				message: node.message,
+				name: node.name,
 				arguments: visit(node.arguments),
 				block: visit(node.block),
 			)
@@ -916,7 +916,7 @@ module Refract
 			OrNode.new(
 				prism_node: node,
 				left: visit(node.left),
-				operator: node.operator_loc.slice,
+				operator: node.operator,
 				right: visit(node.right),
 			)
 		end

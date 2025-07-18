@@ -5,6 +5,7 @@ module Refract
 		def initialize(prism_node: nil, numeric:)
 			@prism_node = prism_node => Prism::Node | nil
 			@numeric = numeric
+			freeze
 		end
 
 		attr_accessor :numeric

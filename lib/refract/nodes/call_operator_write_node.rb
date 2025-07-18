@@ -8,6 +8,7 @@ module Refract
 			@read_name = read_name
 			@binary_operator = binary_operator
 			@value = value
+			freeze
 		end
 
 		attr_accessor :receiver, :read_name, :binary_operator, :value

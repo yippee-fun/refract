@@ -11,17 +11,16 @@ module Refract
 		end
 
 		def around_visit(node)
-			yield
+			yield(node)
 		end
 
 		def visit(node)
 			return unless node
 
 			@stack.push(node)
-			around_visit(node) do
-				node.accept(self)
+			around_visit(node) do |n|
+				n.accept(self).tap { @stack.pop }
 			end
-			@stack.pop
 		end
 
 		def visit_each(nodes)

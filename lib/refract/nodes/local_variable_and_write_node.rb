@@ -7,6 +7,7 @@ module Refract
 			@name = name
 			@value = value
 			@depth = depth
+			freeze
 		end
 
 		attr_accessor :name, :value, :depth

@@ -8,6 +8,7 @@ module Refract
 			@arguments = arguments
 			@block = block
 			@value = value
+			freeze
 		end
 
 		attr_accessor :receiver, :arguments, :block, :value

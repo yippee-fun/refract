@@ -7,6 +7,7 @@ module Refract
 			@left = left
 			@operator = operator
 			@right = right
+			freeze
 		end
 
 		attr_accessor :left, :operator, :right

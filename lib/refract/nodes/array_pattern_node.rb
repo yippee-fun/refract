@@ -8,6 +8,7 @@ module Refract
 			@requireds = requireds
 			@rest = rest
 			@posts = posts
+			freeze
 		end
 
 		attr_accessor :constant, :requireds, :rest, :posts

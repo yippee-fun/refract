@@ -7,8 +7,9 @@ module Refract
 			@receiver = receiver
 			@arguments = arguments
 			@block = block
+			freeze
 		end
 
-		attr_reader :receiver, :arguments, :block
+		attr_accessor :receiver, :arguments, :block
 	end
 end

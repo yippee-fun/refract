@@ -7,6 +7,7 @@ module Refract
 			@receiver = receiver
 			@read_name = read_name
 			@value = value
+			freeze
 		end
 
 		attr_accessor :receiver, :read_name, :value

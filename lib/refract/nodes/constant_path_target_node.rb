@@ -6,6 +6,7 @@ module Refract
 			@prism_node = prism_node => Prism::Node | nil
 			@parent = parent
 			@name = name
+			freeze
 		end
 
 		attr_accessor :parent, :name

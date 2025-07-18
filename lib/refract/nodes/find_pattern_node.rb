@@ -8,6 +8,7 @@ module Refract
 			@left = left
 			@requireds = requireds
 			@right = right
+			freeze
 		end
 
 		attr_accessor :constant, :left, :requireds, :right

@@ -7,6 +7,7 @@ module Refract
 			@target = target
 			@value = value
 			@binary_operator = binary_operator
+			freeze
 		end
 
 		attr_accessor :target, :value, :binary_operator

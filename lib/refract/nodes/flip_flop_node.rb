@@ -7,6 +7,7 @@ module Refract
 			@left = left
 			@right = right
 			@exclude_end = exclude_end
+			freeze
 		end
 
 		attr_accessor :left, :right, :exclude_end

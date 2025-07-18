@@ -6,6 +6,7 @@ module Refract
 			@prism_node = prism_node => Prism::Node | nil
 			@expression = expression
 			@rescue_expression = rescue_expression
+			freeze
 		end
 
 		attr_accessor :expression, :rescue_expression

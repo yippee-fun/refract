@@ -20,7 +20,6 @@ module Refract
 
 		def format_node(node)
 			visit(node)
-			puts @source_map.inspect
 			@buffer.join
 		end
 
@@ -199,7 +198,7 @@ module Refract
 				push "."
 			end
 
-			push node.message
+			push node.name
 
 			case node.block
 			when BlockNode

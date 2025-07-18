@@ -9,6 +9,7 @@ module Refract
 			@block = block
 			@binary_operator = binary_operator
 			@value = value
+			freeze
 		end
 
 		attr_accessor :receiver, :arguments, :block, :binary_operator, :value

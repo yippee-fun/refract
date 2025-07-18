@@ -7,6 +7,7 @@ module Refract
 			@predicate = predicate
 			@statements = statements
 			@else_clause = else_clause
+			freeze
 		end
 
 		attr_accessor :predicate, :statements, :else_clause

@@ -5,8 +5,9 @@ module Refract
 		def initialize(prism_node: nil, statements:)
 			@prism_node = prism_node => Prism::Node | nil
 			@statements = statements
+			freeze
 		end
 
-		attr_reader :statements
+		attr_accessor :statements
 	end
 end

@@ -6,6 +6,7 @@ module Refract
 			@prism_node = prism_node => Prism::Node | nil
 			@new_name = new_name => GlobalVariableReadNode
 			@old_name = old_name => GlobalVariableReadNode
+			freeze
 		end
 
 		attr_accessor :new_name, :old_name

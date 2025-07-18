@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "zeitwerk"
+
 module Refract
 	Loader = Zeitwerk::Loader.for_gem.tap do |loader|
 		loader.ignore("#{__dir__}/ruby_lsp")
@@ -37,10 +38,14 @@ module Refract
 			@prism_node&.location&.start_line
 		end
 
-		def update(**props)
+		def copy(**props)
+			duplicate = dup
+
 			props.each do |k, v|
-				public_send("#{k}=", v)
+				duplicate.public_send("#{k}=", v)
 			end
+
+			duplicate.freeze
 		end
 	end
 end

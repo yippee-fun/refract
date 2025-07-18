@@ -7,6 +7,7 @@ module Refract
 			@constant_path = constant_path
 			@superclass = superclass
 			@body = body
+			freeze
 		end
 
 		attr_accessor :constant_path, :superclass, :body

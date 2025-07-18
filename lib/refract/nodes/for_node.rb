@@ -7,6 +7,7 @@ module Refract
 			@index = index
 			@collection = collection
 			@statements = statements
+			freeze
 		end
 
 		attr_accessor :index, :collection, :statements

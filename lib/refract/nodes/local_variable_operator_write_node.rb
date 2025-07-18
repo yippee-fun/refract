@@ -8,6 +8,7 @@ module Refract
 			@value = value
 			@binary_operator = binary_operator
 			@depth = depth
+			freeze
 		end
 
 		attr_accessor :name, :value, :binary_operator, :depth

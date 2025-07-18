@@ -195,7 +195,7 @@ test "singleton class" do
 
 	assert_refract <<~RUBY
 		class << obj
-			attr_reader(:value)
+			attr_accessor(:value)
 		end
 	RUBY
 end
