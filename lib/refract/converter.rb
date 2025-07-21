@@ -544,6 +544,7 @@ module Refract
 				predicate: visit(node.predicate),
 				statements: visit(node.statements),
 				subsequent: visit(node.subsequent),
+				inline: (node.predicate && node.statements && node.predicate.location.start_offset > node.statements.location.start_offset),
 			)
 		end
 
@@ -1156,6 +1157,7 @@ module Refract
 				predicate: visit(node.predicate),
 				statements: visit(node.statements),
 				else_clause: visit(node.else_clause),
+				inline: (node.predicate && node.statements && node.predicate.location.start_offset > node.statements.location.start_offset),
 			)
 		end
 
@@ -1164,6 +1166,7 @@ module Refract
 				prism_node: node,
 				predicate: visit(node.predicate),
 				statements: visit(node.statements),
+				inline: (node.predicate && node.statements && node.predicate.location.start_offset > node.statements.location.start_offset),
 			)
 		end
 
@@ -1180,6 +1183,7 @@ module Refract
 				prism_node: node,
 				predicate: visit(node.predicate),
 				statements: visit(node.statements),
+				inline: (node.predicate && node.statements && node.predicate.location.start_offset > node.statements.location.start_offset),
 			)
 		end
 
