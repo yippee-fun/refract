@@ -218,16 +218,16 @@ module Refract
 			)
 		end
 
-		visit ConstantPath do |node|
-			node.copy(
-				parent: visit(node.parent),
-			)
-		end
-
 		visit ConstantPathAndWriteNode do |node|
 			node.copy(
 				target: visit(node.target),
 				value: visit(node.value),
+			)
+		end
+
+		visit ConstantPathNode do |node|
+			node.copy(
+				parent: visit(node.parent),
 			)
 		end
 

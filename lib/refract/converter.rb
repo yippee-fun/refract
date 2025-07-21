@@ -309,7 +309,7 @@ module Refract
 		end
 
 		visit Prism::ConstantPathNode do |node|
-			ConstantPath.new(
+			ConstantPathNode.new(
 				prism_node: node,
 				parent: visit(node.parent),
 				name: node.name,

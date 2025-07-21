@@ -357,16 +357,16 @@ module Refract
 			visit node.value
 		end
 
-		visit ConstantPath do |node|
-			visit node.parent
-			push "::"
-			push node.name
-		end
-
 		visit ConstantPathAndWriteNode do |node|
 			visit node.target
 			push " &&= "
 			visit node.value
+		end
+
+		visit ConstantPathNode do |node|
+			visit node.parent
+			push "::"
+			push node.name
 		end
 
 		visit ConstantPathOperatorWriteNode do |node|
