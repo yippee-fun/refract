@@ -2,8 +2,10 @@
 
 module Refract
 	class ForwardingSuperNode < Node
-		def initialize(block:)
+		def initialize(prism_node: nil, block:)
+			@prism_node = prism_node => Prism::Node | nil
 			@block = block
+			freeze
 		end
 
 		attr_accessor :block

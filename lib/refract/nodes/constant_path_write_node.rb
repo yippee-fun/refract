@@ -2,9 +2,11 @@
 
 module Refract
 	class ConstantPathWriteNode < Node
-		def initialize(target:, value:)
+		def initialize(prism_node: nil, target:, value:)
+			@prism_node = prism_node => Prism::Node | nil
 			@target = target
 			@value = value
+			freeze
 		end
 
 		attr_accessor :target, :value

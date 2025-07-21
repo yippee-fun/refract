@@ -2,9 +2,11 @@
 
 module Refract
 	class InstanceVariableAndWriteNode < Node
-		def initialize(name:, value:)
+		def initialize(prism_node: nil, name:, value:)
+			@prism_node = prism_node => Prism::Node | nil
 			@name = name
 			@value = value
+			freeze
 		end
 
 		attr_accessor :name, :value

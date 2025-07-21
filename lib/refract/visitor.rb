@@ -166,13 +166,13 @@ module Refract
 			visit node.value
 		end
 
-		visit ConstantPath do |node|
-			visit node.parent
-		end
-
 		visit ConstantPathAndWriteNode do |node|
 			visit node.target
 			visit node.value
+		end
+
+		visit ConstantPathNode do |node|
+			visit node.parent
 		end
 
 		visit ConstantPathOperatorWriteNode do |node|

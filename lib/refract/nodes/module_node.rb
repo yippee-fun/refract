@@ -2,9 +2,11 @@
 
 module Refract
 	class ModuleNode < Node
-		def initialize(constant_path:, body:)
+		def initialize(prism_node: nil, constant_path:, body:)
+			@prism_node = prism_node => Prism::Node | nil
 			@constant_path = constant_path
 			@body = body
+			freeze
 		end
 
 		attr_accessor :constant_path, :body

@@ -10,12 +10,17 @@ module Refract
 			define_method("visit_#{node_class.type}", &)
 		end
 
+		def around_visit(node)
+			yield(node)
+		end
+
 		def visit(node)
 			return unless node
 
 			@stack.push(node)
-			node.accept(self)
-			@stack.pop
+			around_visit(node) do |n|
+				n.accept(self).tap { @stack.pop }
+			end
 		end
 
 		def visit_each(nodes)

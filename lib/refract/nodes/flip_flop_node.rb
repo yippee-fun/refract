@@ -2,10 +2,12 @@
 
 module Refract
 	class FlipFlopNode < Node
-		def initialize(left:, right:, exclude_end:)
+		def initialize(prism_node: nil, left:, right:, exclude_end:)
+			@prism_node = prism_node => Prism::Node | nil
 			@left = left
 			@right = right
 			@exclude_end = exclude_end
+			freeze
 		end
 
 		attr_accessor :left, :right, :exclude_end

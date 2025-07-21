@@ -195,7 +195,7 @@ test "singleton class" do
 
 	assert_refract <<~RUBY
 		class << obj
-			attr_reader(:value)
+			attr_accessor(:value)
 		end
 	RUBY
 end
@@ -774,6 +774,10 @@ test "if" do
 	RUBY
 
 	assert_refract <<~RUBY
+		foo if (foo = true)
+	RUBY
+
+	assert_refract <<~RUBY
 		if foo
 			bar
 		else
@@ -800,6 +804,10 @@ test "unless" do
 	RUBY
 
 	assert_refract <<~RUBY
+		foo unless (foo = true)
+	RUBY
+
+	assert_refract <<~RUBY
 		unless foo
 			bar
 		else
@@ -814,6 +822,10 @@ test "while" do
 			bar
 		end
 	RUBY
+
+	assert_refract <<~RUBY
+		b.<<(i) while (i = a.pop)
+	RUBY
 end
 
 test "until" do
@@ -821,6 +833,10 @@ test "until" do
 		until foo
 			bar
 		end
+	RUBY
+
+	assert_refract <<~RUBY
+		b.<<(i) until (i = a.pop)
 	RUBY
 end
 

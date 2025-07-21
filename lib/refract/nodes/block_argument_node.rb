@@ -2,8 +2,10 @@
 
 module Refract
 	class BlockArgumentNode < Node
-		def initialize(expression:)
+		def initialize(prism_node: nil, expression:)
+			@prism_node = prism_node => Prism::Node | nil
 			@expression = expression
+			freeze
 		end
 
 		attr_accessor :expression

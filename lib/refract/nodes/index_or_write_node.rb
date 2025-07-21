@@ -2,11 +2,13 @@
 
 module Refract
 	class IndexOrWriteNode < Node
-		def initialize(receiver:, arguments:, block:, value:)
+		def initialize(prism_node: nil, receiver:, arguments:, block:, value:)
+			@prism_node = prism_node => Prism::Node | nil
 			@receiver = receiver
 			@arguments = arguments
 			@block = block
 			@value = value
+			freeze
 		end
 
 		attr_accessor :receiver, :arguments, :block, :value

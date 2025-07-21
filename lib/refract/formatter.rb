@@ -10,6 +10,14 @@ module Refract
 			@indent = 0
 		end
 
+		def around_visit(node)
+			if (start_line = node.start_line)
+				@source_map[@current_line] = start_line
+			end
+
+			super
+		end
+
 		def format_node(node)
 			visit(node)
 			@buffer.join
@@ -190,7 +198,7 @@ module Refract
 				push "."
 			end
 
-			push node.message
+			push node.name
 
 			case node.block
 			when BlockNode
@@ -349,16 +357,16 @@ module Refract
 			visit node.value
 		end
 
-		visit ConstantPath do |node|
-			visit node.parent
-			push "::"
-			push node.name
-		end
-
 		visit ConstantPathAndWriteNode do |node|
 			visit node.target
 			push " &&= "
 			visit node.value
+		end
+
+		visit ConstantPathNode do |node|
+			visit node.parent
+			push "::"
+			push node.name
 		end
 
 		visit ConstantPathOperatorWriteNode do |node|
@@ -563,25 +571,31 @@ module Refract
 		end
 
 		visit IfNode do |node|
-			# Check if this is an elsif by looking at the parent
-			if IfNode === @stack[-2]
-				push "elsif "
+			if node.inline
+				visit node.statements
+				push " if "
+				visit node.predicate
 			else
-				push "if "
-			end
-			visit node.predicate
-			if node.statements
-				indent do
-					visit node.statements
+				# Check if this is an elsif by looking at the parent
+				if IfNode === @stack[-2]
+					push "elsif "
+				else
+					push "if "
 				end
-			end
-			if node.subsequent
-				new_line
-				visit node.subsequent
-			end
-			unless IfNode === @stack[-2]
-				new_line
-				push "end"
+				visit node.predicate
+				if node.statements
+					indent do
+						visit node.statements
+					end
+				end
+				if node.subsequent
+					new_line
+					visit node.subsequent
+				end
+				unless IfNode === @stack[-2]
+					new_line
+					push "end"
+				end
 			end
 		end
 
@@ -1136,34 +1150,46 @@ module Refract
 		end
 
 		visit UnlessNode do |node|
-			push "unless "
-			visit node.predicate
+			if node.inline
+				visit node.statements
+				push " unless "
+				visit node.predicate
+			else
+				push "unless "
+				visit node.predicate
 
-			if node.statements
-				indent do
-					visit node.statements
+				if node.statements
+					indent do
+						visit node.statements
+					end
 				end
-			end
 
-			if node.else_clause
+				if node.else_clause
+					new_line
+					visit node.else_clause
+				end
+
 				new_line
-				visit node.else_clause
+				push "end"
 			end
-
-			new_line
-			push "end"
 		end
 
 		visit UntilNode do |node|
-			push "until "
-			visit node.predicate
-			if node.statements
-				indent do
-					visit node.statements
+			if node.inline
+				visit node.statements
+				push " until "
+				visit node.predicate
+			else
+				push "until "
+				visit node.predicate
+				if node.statements
+					indent do
+						visit node.statements
+					end
 				end
+				new_line
+				push "end"
 			end
-			new_line
-			push "end"
 		end
 
 		visit WhenNode do |node|
@@ -1176,15 +1202,21 @@ module Refract
 		end
 
 		visit WhileNode do |node|
-			push "while "
-			visit node.predicate
-			if node.statements
-				indent do
-					visit node.statements
+			if node.inline
+				visit node.statements
+				push " while "
+				visit node.predicate
+			else
+				push "while "
+				visit node.predicate
+				if node.statements
+					indent do
+						visit node.statements
+					end
 				end
+				new_line
+				push "end"
 			end
-			new_line
-			push "end"
 		end
 
 		visit XStringNode do |node|
@@ -1218,7 +1250,8 @@ module Refract
 		end
 
 		private def new_line
-			push "\n#{"\t" * @indent}"
+			@buffer << "\n#{"\t" * @indent}"
+			@current_line += 1
 		end
 
 		private def indent
