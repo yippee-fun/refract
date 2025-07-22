@@ -2,11 +2,13 @@
 
 module Refract
 	class Formatter < BasicVisitor
-		def initialize
-			super
+		Result = Data.define(:source, :source_map)
+
+		def initialize(starting_line: 1)
+			super()
 			@buffer = []
 			@source_map = []
-			@current_line = 1
+			@current_line = starting_line
 			@indent = 0
 		end
 
@@ -20,7 +22,11 @@ module Refract
 
 		def format_node(node)
 			visit(node)
-			@buffer.join
+
+			Result.new(
+				source: @buffer.join,
+				source_map: @source_map,
+			)
 		end
 
 		visit AliasGlobalVariableNode do |node|
@@ -1115,7 +1121,7 @@ module Refract
 		end
 
 		visit StatementsNode do |node|
-			visit_each(node.body) { new_line }
+			visit_each(node.body.flat_map { |n| (Refract::StatementsNode === n) ? n.body : n }) { new_line }
 		end
 
 		visit StringNode do |node|
