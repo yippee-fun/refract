@@ -1135,6 +1135,7 @@ module Refract
 			SymbolNode.new(
 				prism_node: node,
 				unescaped: node.unescaped,
+				quoted: node.opening_loc && node.closing_loc,
 			)
 		end
 

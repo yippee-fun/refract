@@ -270,6 +270,20 @@ test "constant path target" do
 	RUBY
 end
 
+test "symbol" do
+	assert_refract <<~RUBY
+  :symbol
+	RUBY
+
+	assert_refract <<~RUBY
+  :"symbol"
+	RUBY
+
+	assert_refract <<~RUBY
+  :'symb"ol'
+	RUBY
+end
+
 test "interpolated symbol" do
 	assert_refract <<~RUBY
 		bar = "test"
@@ -399,6 +413,12 @@ test "arguments" do
 
 	assert_refract <<~RUBY
 		foo(bar, baz:)
+	RUBY
+end
+
+test "assoc arguments" do
+	assert_refract <<~RUBY
+		foo(bar: "baz", "quoted-symbol": "value", 'single-"quoted"': 123)
 	RUBY
 end
 
@@ -1015,7 +1035,7 @@ end
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)
-	result = Refract::Formatter.new.format_node(node)
+	result = Refract::Formatter.new.format_node(node).source
 
 	assert_equal_ruby result, input.strip
 	assert_equal result, input.strip

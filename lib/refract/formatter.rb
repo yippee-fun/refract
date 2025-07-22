@@ -83,7 +83,13 @@ module Refract
 		visit AssocNode do |node|
 			case node.key
 			when SymbolNode
-				push node.key.unescaped
+				if node.key.quoted
+					doubles do
+						push node.key.unescaped.gsub('"', '\"')
+					end
+				else
+					push node.key.unescaped
+				end
 				push ":"
 				space unless ImplicitNode === node.value
 				visit node.value
@@ -1142,7 +1148,13 @@ module Refract
 
 		visit SymbolNode do |node|
 			push ":"
-			push node.unescaped
+			if node.quoted
+				doubles do
+					push node.unescaped.gsub('"', '\"')
+				end
+			else
+				push node.unescaped
+			end
 		end
 
 		visit TrueNode do |node|
