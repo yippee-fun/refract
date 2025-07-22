@@ -87,6 +87,12 @@ test "super" do
 	assert_refract <<~RUBY
 		super(1, 2)
 	RUBY
+
+	assert_refract <<~RUBY
+		def foo(&)
+			super(&)
+		end
+	RUBY
 end
 
 test "alias method" do

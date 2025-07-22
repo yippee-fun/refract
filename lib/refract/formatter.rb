@@ -1137,12 +1137,28 @@ module Refract
 
 		visit SuperNode do |node|
 			push "super"
-			if node.arguments
+			case node.block
+			when BlockNode
+				if node.arguments
+					parens { visit node.arguments }
+				end
+
+				space
+				visit node.block
+			when BlockArgumentNode
 				parens do
-					visit node.arguments
+					if node.arguments
+						visit node.arguments
+						push ", "
+					end
+
+					visit node.block
+				end
+			else
+				if node.arguments
+					parens { visit node.arguments }
 				end
 			end
-			visit node.block if node.block
 		end
 
 		visit SymbolNode do |node|
