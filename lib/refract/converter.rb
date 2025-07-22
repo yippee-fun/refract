@@ -163,6 +163,7 @@ module Refract
 				name: node.name,
 				arguments: visit(node.arguments),
 				block: visit(node.block),
+				safe_navigation: node.safe_navigation?,
 			)
 		end
 

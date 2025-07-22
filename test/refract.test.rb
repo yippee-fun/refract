@@ -1032,6 +1032,12 @@ test "pre execution" do
 	RUBY
 end
 
+test "lonly" do
+	assert_refract <<~RUBY
+		foo&.bar
+	RUBY
+end
+
 def assert_refract(input)
 	tree = Prism.parse(input).value
 	node = Refract::Converter.new.visit(tree)

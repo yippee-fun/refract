@@ -205,6 +205,7 @@ module Refract
 		visit CallNode do |node|
 			if node.receiver
 				visit node.receiver
+				push "&" if node.safe_navigation
 				push "."
 			end
 
