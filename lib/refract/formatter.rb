@@ -110,32 +110,30 @@ module Refract
 		end
 
 		visit BeginNode do |node|
-			outdent do
-				push "begin"
+			push "begin"
 
-				indent do
-					visit node.statements
-				end
-
-				new_line
-
-				if node.rescue_clause
-					visit node.rescue_clause
-					new_line
-				end
-
-				if node.else_clause
-					visit node.else_clause
-					new_line
-				end
-
-				if node.ensure_clause
-					visit node.ensure_clause
-					new_line
-				end
-
-				push "end"
+			indent do
+				visit node.statements
 			end
+
+			new_line
+
+			if node.rescue_clause
+				visit node.rescue_clause
+				new_line
+			end
+
+			if node.else_clause
+				visit node.else_clause
+				new_line
+			end
+
+			if node.ensure_clause
+				visit node.ensure_clause
+				new_line
+			end
+
+			push "end"
 		end
 
 		visit BlockArgumentNode do |node|
