@@ -34,7 +34,7 @@ jobs:
           bundle install --jobs 4 --without development
 
       - name: Quickdraw Tests
-        run: bundle exec qt -t 1
+        run: bundle exec qt
 
   rubocop:
     runs-on: "ubuntu-latest"
