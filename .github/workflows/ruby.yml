@@ -31,7 +31,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          bundle install --jobs 4 --without development
+          # `--without` was removed from Bundler; it relied on being remembered
+          # across invocations, which Bundler no longer does. The flag makes the
+          # Ruby head job fail before a single gem is installed.
+          bundle config set --local without development
+          bundle install --jobs 4
 
       - name: Quickdraw Tests
         run: bundle exec qt
