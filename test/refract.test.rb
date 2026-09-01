@@ -563,6 +563,89 @@ test "block parameter" do
 	RUBY
 end
 
+test "string escaping" do
+	# Non-interpolating heredocs: the source below is what Prism sees, verbatim.
+	assert_refract <<~'RUBY'
+		"a\#{b}"
+	RUBY
+
+	assert_refract <<~'RUBY'
+		"C:\\temp"
+	RUBY
+
+	assert_refract <<~'RUBY'
+		"it's \"hi\""
+	RUBY
+
+	assert_refract <<~'RUBY'
+		"a\\b#{c}"
+	RUBY
+end
+
+test "symbol escaping" do
+	assert_refract <<~'RUBY'
+		:"a\#{b}"
+	RUBY
+
+	assert_refract <<~'RUBY'
+		:"a\\b#{c}"
+	RUBY
+end
+
+test "assoc key escaping" do
+	assert_refract <<~'RUBY'
+		foo("a\#{b}": 1)
+	RUBY
+end
+
+test "block parameter destructuring" do
+	assert_refract <<~RUBY
+		foo { |(a, b), c|
+			a
+		}
+	RUBY
+
+	assert_refract <<~RUBY
+		foo { |a, (b, c)|
+			a
+		}
+	RUBY
+
+	assert_refract <<~RUBY
+		foo { |(a, (b, c)), d|
+			a
+		}
+	RUBY
+
+	assert_refract <<~RUBY
+		foo { |(a, *b), c|
+			a
+		}
+	RUBY
+end
+
+test "multiple assignment with a nested target" do
+	assert_refract <<~RUBY
+		a, (b, c) = [
+			1,
+			[
+				2,
+				3
+			]
+		]
+	RUBY
+
+	assert_refract <<~RUBY
+		(a, b), c = [
+			[
+				1,
+				2
+			],
+			3
+		]
+	RUBY
+end
+
 test "def" do
 	assert_refract <<~RUBY
 		def Foo.bar(a, b = 1, *c, d, e:, f: 1, **g, &h)
