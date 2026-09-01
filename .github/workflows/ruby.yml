@@ -1,7 +1,10 @@
 name: CI
 on:
   push:
-    branches: ["main"]
+    # Every branch, so a branch pushed to a fork gets its own run instead of
+    # waiting on a maintainer to approve the workflow of a fork pull request.
+    # "**" rather than "*" because the latter does not match a slash.
+    branches: ["**"]
   pull_request:
     branches: ["main"]
 jobs:
