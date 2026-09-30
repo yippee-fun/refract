@@ -12,8 +12,13 @@ module SemanticTree
 	RoundTrip = Data.define(:source, :errors, :mismatch)
 
 	IGNORED_FLAGS = %i[
-		binary? decimal? octal? hexadecimal?
-		forced_utf8_encoding? forced_binary_encoding? forced_us_ascii_encoding?
+		binary?
+		decimal?
+		octal?
+		hexadecimal?
+		forced_utf8_encoding?
+		forced_binary_encoding?
+		forced_us_ascii_encoding?
 	].freeze
 
 	BODY_OWNERS = [
@@ -56,8 +61,14 @@ module SemanticTree
 		case node
 		when nil
 			nil
+		when Prism::ParenthesesNode
+			if node.body in Prism::StatementsNode[body: [statement]]
+				of(statement)
+			else
+				[node.type, fields(node)]
+			end
 		when Prism::SourceLineNode
-			[:integer_node, [[:value, node.location.start_line]]]
+			[:integer_node, [[:flags, []], [:value, node.location.start_line]]]
 		when Prism::InterpolatedStringNode
 			parts = parts(node)
 			case parts
@@ -123,8 +134,8 @@ module SemanticTree
 		(field.flags - IGNORED_FLAGS).select { |flag| node.public_send(flag) }
 	end
 
-	private def string(node, value)
-		value = normalize_regexp(value) if REGEXPS.any? { |it| it === node }
+	private def string(node, value, regexp = node)
+		value = normalize_regexp(regexp, value) if REGEXPS.any? { |it| it === regexp }
 
 		encoding = if node.respond_to?(:forced_utf8_encoding?) && node.forced_utf8_encoding?
 			Encoding::UTF_8
@@ -133,23 +144,32 @@ module SemanticTree
 		else
 			value.encoding
 		end
+		encoding = Encoding::US_ASCII if Prism::SymbolNode === node && value.ascii_only?
 
 		[value.b, encoding]
 	end
 
 	# `\/` and `/` are the same regexp, but only one can appear inside `/.../`.
-	private def normalize_regexp(value)
-		value.b.gsub(%r{\\.}mn) { |escape| (escape == "\\/") ? "/" : escape }
+	# Likewise `\#` and `#`, outside extended mode where `#` starts a comment.
+	private def normalize_regexp(node, value)
+		value.b.gsub(/\\./mn) do |escape|
+			case escape
+			in "\\/" then "/"
+			in "\\#" unless node.extended? then "#"
+			else escape
+			end
+		end
 	end
 
 	private def parts(node)
 		flatten(node.parts).each_with_object([]) do |part, parts|
 			case part
 			when Prism::StringNode
-				bytes, encoding = string(node, part.unescaped)
+				bytes, encoding = string(part, part.unescaped, node)
 				next if bytes.empty?
 
-				if parts.last in [:string, [previous, _]]
+				if parts.last in [:string, [previous, previous_encoding]]
+					encoding = previous_encoding if bytes.ascii_only?
 					parts[-1] = [:string, [previous + bytes, encoding]]
 				else
 					parts << [:string, [bytes, encoding]]

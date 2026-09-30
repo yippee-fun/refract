@@ -4,6 +4,7 @@ module Refract
 	class ItLocalVariableReadNode < Node
 		def initialize(prism_node: nil)
 			@prism_node = prism_node => Prism::Node | nil
+			freeze
 		end
 	end
 end

@@ -18,9 +18,9 @@ module Refract
 			return unless node
 
 			@stack.push(node)
-			around_visit(node) do |n|
-				n.accept(self).tap { @stack.pop }
-			end
+			around_visit(node) { |n| n.accept(self) }
+		ensure
+			@stack.pop if node
 		end
 
 		def visit_each(nodes)

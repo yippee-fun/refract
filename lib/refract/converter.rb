@@ -153,6 +153,7 @@ module Refract
 				receiver: visit(node.receiver),
 				read_name: node.read_name,
 				value: visit(node.value),
+				safe_navigation: node.safe_navigation?,
 			)
 		end
 
@@ -164,6 +165,8 @@ module Refract
 				arguments: visit(node.arguments),
 				block: visit(node.block),
 				safe_navigation: node.safe_navigation?,
+				variable_call: node.variable_call?,
+				attribute_write: node.attribute_write?,
 			)
 		end
 
@@ -174,6 +177,7 @@ module Refract
 				read_name: node.read_name,
 				binary_operator: node.binary_operator,
 				value: visit(node.value),
+				safe_navigation: node.safe_navigation?,
 			)
 		end
 
@@ -183,6 +187,7 @@ module Refract
 				receiver: visit(node.receiver),
 				read_name: node.read_name,
 				value: visit(node.value),
+				safe_navigation: node.safe_navigation?,
 			)
 		end
 
@@ -534,6 +539,7 @@ module Refract
 		visit Prism::HashPatternNode do |node|
 			HashPatternNode.new(
 				prism_node: node,
+				constant: visit(node.constant),
 				elements: node.elements&.map { |n| visit(n) },
 				rest: visit(node.rest),
 			)
@@ -978,6 +984,8 @@ module Refract
 			ProgramNode.new(
 				prism_node: node,
 				statements: visit(node.statements),
+				frozen_string_literal: frozen_string_literal(node),
+				encoding: node.slice.encoding,
 			)
 		end
 
@@ -1078,6 +1086,7 @@ module Refract
 			ShareableConstantNode.new(
 				prism_node: node,
 				write: visit(node.write),
+				value: shareable_constant_value(node),
 			)
 		end
 
@@ -1124,7 +1133,7 @@ module Refract
 		visit Prism::StringNode do |node|
 			StringNode.new(
 				prism_node: node,
-				unescaped: node.unescaped,
+				unescaped: unescaped(node),
 			)
 		end
 
@@ -1139,7 +1148,7 @@ module Refract
 		visit Prism::SymbolNode do |node|
 			SymbolNode.new(
 				prism_node: node,
-				unescaped: node.unescaped,
+				unescaped: unescaped(node),
 				quoted: node.opening_loc && node.closing_loc,
 			)
 		end
@@ -1196,7 +1205,7 @@ module Refract
 		visit Prism::XStringNode do |node|
 			XStringNode.new(
 				prism_node: node,
-				unescaped: node.unescaped,
+				unescaped: unescaped(node),
 			)
 		end
 
@@ -1205,6 +1214,60 @@ module Refract
 				prism_node: node,
 				arguments: visit(node.arguments),
 			)
+		end
+
+		# Prism records the `frozen_string_literal` magic comment on each string
+		# literal. Interpolated parts, hash keys, `when` conditions and lone
+		# strings in `#{}` are always marked frozen, so they are skipped, and
+		# interpolated strings can be marked mutable regardless of the comment.
+		private def frozen_string_literal(node)
+			queue = [node]
+
+			while (current = queue.shift)
+				case current
+				when Prism::StringNode, Prism::SourceFileNode
+					return true if current.frozen?
+					return false if current.mutable?
+				when Prism::InterpolatedStringNode
+					return true if current.frozen?
+				end
+
+				case current
+				when Prism::InterpolatedStringNode, Prism::InterpolatedSymbolNode, Prism::InterpolatedXStringNode,
+						Prism::InterpolatedRegularExpressionNode, Prism::InterpolatedMatchLastLineNode
+
+					queue.concat(current.parts.grep_v(Prism::StringNode))
+				when Prism::AssocNode
+					queue << current.key unless Prism::StringNode === current.key
+					queue << current.value if current.value
+				when Prism::WhenNode
+					queue.concat(current.conditions.grep_v(Prism::StringNode))
+					queue << current.statements if current.statements
+				when Prism::EmbeddedStatementsNode
+					queue << current.statements unless current.statements&.body in [Prism::StringNode] | nil
+				else
+					queue.concat(current.compact_child_nodes)
+				end
+			end
+		end
+
+		private def shareable_constant_value(node)
+			if node.literal? then :literal
+			elsif node.experimental_everything? then :experimental_everything
+			elsif node.experimental_copy? then :experimental_copy
+			end
+		end
+
+		# Prism returns content in the source encoding and flags escapes that
+		# force a different one, e.g. `"é"` in a US-ASCII file is UTF-8.
+		private def unescaped(node)
+			if node.forced_utf8_encoding?
+				node.unescaped.dup.force_encoding(Encoding::UTF_8)
+			elsif node.forced_binary_encoding?
+				node.unescaped.b
+			else
+				node.unescaped
+			end
 		end
 
 		private def regexp_encoding(node)

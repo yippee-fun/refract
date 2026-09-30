@@ -5,7 +5,7 @@ module Refract
 		def initialize(prism_node: nil, new_name:, old_name:)
 			@prism_node = prism_node => Prism::Node | nil
 			@new_name = new_name => GlobalVariableReadNode
-			@old_name = old_name => GlobalVariableReadNode
+			@old_name = old_name => GlobalVariableReadNode | BackReferenceReadNode | NumberedReferenceReadNode
 			freeze
 		end
 

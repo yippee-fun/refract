@@ -34,6 +34,7 @@ module Refract
 			visit node.constant
 			visit_each node.requireds
 			visit node.rest
+			visit_each node.posts
 		end
 
 		visit AssocNode do |node|
@@ -299,6 +300,7 @@ module Refract
 		end
 
 		visit HashPatternNode do |node|
+			visit node.constant
 			visit_each node.elements
 			visit node.rest
 		end
@@ -314,7 +316,7 @@ module Refract
 		end
 
 		visit ImplicitNode do |node|
-			nil
+			visit node.value
 		end
 
 		visit ImplicitRestNode do |node|

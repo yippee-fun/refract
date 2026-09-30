@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "prism"
 require "zeitwerk"
 
 module Refract
@@ -18,8 +19,30 @@ module Refract
 			@type = demodularized_name.gsub(/(?<=[A-Z])(?=[A-Z][a-z])|(?<=[a-z\d])(?=[A-Z])/, "_").downcase
 		end
 
+		def self.attributes
+			return @attributes if defined?(@attributes)
+
+			@attributes = instance_method(:initialize).parameters.filter_map do |parameter|
+				case parameter
+				in [:key | :keyreq, :prism_node] then nil
+				in [:key | :keyreq, name] then name
+				end
+			end.freeze
+		end
+
 		def type
 			self.class.type
+		end
+
+		def deconstruct_keys(keys)
+			attributes = self.class.attributes
+			attributes &= keys if keys
+			attributes.to_h { |name| [name, public_send(name)] }
+		end
+
+		def inspect
+			attributes = self.class.attributes.map { |name| " #{name}: #{public_send(name).inspect}" }
+			"#<#{self.class.name}#{attributes.join(',')}>"
 		end
 
 		def accept(visitor)

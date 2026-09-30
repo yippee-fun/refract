@@ -51,6 +51,7 @@ module Refract
 				constant: visit(node.constant),
 				requireds: node.requireds&.map { |n| visit(n) },
 				rest: visit(node.rest),
+				posts: node.posts&.map { |n| visit(n) },
 			)
 		end
 
@@ -207,6 +208,18 @@ module Refract
 		end
 
 		visit ClassVariableWriteNode do |node|
+			node.copy(
+				value: visit(node.value),
+			)
+		end
+
+		visit ConstantAndWriteNode do |node|
+			node.copy(
+				value: visit(node.value),
+			)
+		end
+
+		visit ConstantOperatorWriteNode do |node|
 			node.copy(
 				value: visit(node.value),
 			)
@@ -396,6 +409,7 @@ module Refract
 
 		visit HashPatternNode do |node|
 			node.copy(
+				constant: visit(node.constant),
 				elements: node.elements&.map { |n| visit(n) },
 				rest: visit(node.rest),
 			)
@@ -416,7 +430,9 @@ module Refract
 		end
 
 		visit ImplicitNode do |node|
-			node
+			node.copy(
+				value: visit(node.value),
+			)
 		end
 
 		visit ImplicitRestNode do |node|

@@ -5,13 +5,15 @@ module Refract
 		Result = Data.define(:source, :source_map)
 
 		IDENTIFIER = /(?:[A-Za-z_]|[^\x00-\x7F])(?:\w|[^\x00-\x7F])*/
+		BARE_IDENTIFIER = /\A#{IDENTIFIER}\z/
+		SETTER = /\A#{IDENTIFIER}=\z/
 		LABEL = /\A#{IDENTIFIER}[?!]?\z/
 		BARE_SYMBOL = %r{
 			\A(?:
 				#{IDENTIFIER}[?!=]?
 				| @@?#{IDENTIFIER}
 				| \$(?:#{IDENTIFIER}|-\w|\d+|[~*$?!@/\\;,.=:<>"&`'+])
-				| \[\]=? | [+\-~!]@? | \*\*? | [/%&|^`] | <=> | ===? | =~ | !~ | != | <[<=]? | >[>=]?
+				| \[\]=? | [+\-]@? | [~!] | \*\*? | [/%&|^`] | <=> | ===? | =~ | !~ | != | <[<=]? | >[>=]?
 			)\z
 		}x
 
@@ -26,10 +28,16 @@ module Refract
 			"\e" => "\\e",
 		}.freeze
 
+		# In a regexp, `#` only needs escaping where it would start interpolation.
+		# The end of the source counts, since the closing `/` can form `$/`.
+		REGEXP_INTERPOLATION = %r{#(?=\{|@@?(?:[A-Za-z_]|[^\x00-\x7F])|\$(?:[A-Za-z_~*$?!@/\\;,.=:<>"&`'+\d]|-\w|[^\x00-\x7F]|\z))}
+
 		ESCAPE_PATTERNS = {
 			'"' => /[\\"]|#(?=[{@$])|[^[:print:]]/,
 			"`" => /[\\`]|#(?=[{@$])|[^[:print:]]/,
 		}.freeze
+
+		NON_ASCII = /[^\x00-\x7F]/
 
 		REGEXP_ENCODINGS = {
 			ascii_8bit: "n",
@@ -44,14 +52,28 @@ module Refract
 			@source_map = []
 			@current_line = starting_line
 			@indent = 0
+			@shareable_constant_value = :none
 		end
 
-		def around_visit(node)
-			if (start_line = node.start_line)
-				@source_map[@current_line] = start_line
-			end
+		def around_visit(node, &)
+			value = shareable_constant_value_within(node) if statement?(node)
 
-			super
+			if value && (value != :none || @shareable_constant_value != :none)
+				shareable_constant_value(value) { map_source_and_visit(node, &) }
+			else
+				map_source_and_visit(node, &)
+			end
+		end
+
+		def visit_each(nodes)
+			nodes = nodes.compact
+			last = nodes.length - 1
+
+			nodes.each_with_index do |node, index|
+				length = @buffer.length
+				visit node
+				yield if block_given? && index < last && @buffer.length > length
+			end
 		end
 
 		def format_node(node)
@@ -109,22 +131,23 @@ module Refract
 		visit ArrayPatternNode do |node|
 			visit node.constant
 			brackets do
-				visit_each(node.requireds) { push ", " }
-				visit(node.rest)
+				visit_each([*node.requireds, node.rest, *node.posts]) { push ", " }
 			end
 		end
 
 		visit AssocNode do |node|
 			case node.key
 			when SymbolNode
-				if node.key.quoted || !node.key.unescaped.match?(LABEL)
-					push quote(node.key.unescaped)
-				else
-					push node.key.unescaped
-				end
+				bare = !node.key.quoted && bare?(node.key.unescaped, LABEL)
+				push(bare ? node.key.unescaped : quote(node.key.unescaped))
 				push ":"
-				space unless ImplicitNode === node.value
-				visit node.value
+
+				if ImplicitNode === node.value && bare && shorthand?(node.key, node.value.value)
+					visit node.value
+				else
+					space
+					visit((ImplicitNode === node.value) ? node.value.value : node.value)
+				end
 			else
 				visit node.key
 				push " => "
@@ -222,25 +245,33 @@ module Refract
 		end
 
 		visit CallAndWriteNode do |node|
-			if node.receiver
-				visit node.receiver
-				push "."
-			end
-
+			call_receiver(node)
 			push node.read_name
-			space
-			push "&&="
-			space
+			push " &&= "
 			visit node.value
 		end
 
 		visit CallNode do |node|
-			if node.receiver
-				visit node.receiver
-				push "&" if node.safe_navigation
-				push "."
+			arguments = node.arguments&.arguments
+
+			if node.attribute_write && node.block.nil? && arguments
+				if node.name == :[]= && !node.safe_navigation
+					*index, value = arguments
+					parenthesize(low_precedence?(node.receiver)) { visit node.receiver }
+					brackets { visit_each(index) { push ", " } }
+					push " = "
+					visit value
+					return
+				elsif node.name.match?(SETTER) && arguments.length == 1
+					call_receiver(node)
+					push node.name.name.delete_suffix("=")
+					push " = "
+					visit arguments.first
+					return
+				end
 			end
 
+			call_receiver(node)
 			push node.name
 
 			case node.block
@@ -263,30 +294,23 @@ module Refract
 			else
 				if node.arguments
 					parens { visit node.arguments }
+				elsif !node.receiver && !node.variable_call && node.name.match?(BARE_IDENTIFIER)
+					push "()"
 				end
 			end
 		end
 
 		visit CallOperatorWriteNode do |node|
-			if node.receiver
-				visit node.receiver
-				push "."
-			end
-
+			call_receiver(node)
 			push node.read_name
 			space
 			push node.binary_operator
-			push "="
-			space
+			push "= "
 			visit node.value
 		end
 
 		visit CallOrWriteNode do |node|
-			if node.receiver
-				visit node.receiver
-				push "."
-			end
-
+			call_receiver(node)
 			push node.read_name
 			push " ||= "
 			visit node.value
@@ -606,10 +630,17 @@ module Refract
 		end
 
 		visit HashPatternNode do |node|
-			braces do
-				space
-				visit_each([*node.elements, node.rest]) { push ", " }
-				space
+			if node.constant
+				visit node.constant
+				brackets do
+					visit_each([*node.elements, node.rest]) { push ", " }
+				end
+			else
+				braces do
+					space
+					visit_each([*node.elements, node.rest]) { push ", " }
+					space
+				end
 			end
 		end
 
@@ -618,13 +649,8 @@ module Refract
 				visit node.statements
 				push " if "
 				visit node.predicate
-			else
-				# Check if this is an elsif by looking at the parent
-				if IfNode === @stack[-2]
-					push "elsif "
-				else
-					push "if "
-				end
+			elsif (IfNode === @stack[-2]) && @stack[-2].subsequent.equal?(node)
+				push "elsif "
 				visit node.predicate
 				if node.statements
 					indent do
@@ -635,7 +661,19 @@ module Refract
 					new_line
 					visit node.subsequent
 				end
-				unless IfNode === @stack[-2]
+			else
+				parenthesize(modifier_ambiguous?) do
+					push "if "
+					visit node.predicate
+					if node.statements
+						indent do
+							visit node.statements
+						end
+					end
+					if node.subsequent
+						new_line
+						visit node.subsequent
+					end
 					new_line
 					push "end"
 				end
@@ -867,8 +905,9 @@ module Refract
 		end
 
 		visit MatchWriteNode do |node|
-			visit node.call
-			# Targets are written to by the match
+			visit node.call.receiver
+			push " =~ "
+			visit node.call.arguments
 		end
 
 		visit MissingNode do |node|
@@ -889,7 +928,9 @@ module Refract
 		end
 
 		visit MultiTargetNode do |node|
-			visit_each([*node.lefts, node.rest, *node.rights]) { push ", " }
+			parenthesize(!(ForNode === @stack[-2])) do
+				visit_each([*node.lefts, node.rest, *node.rights]) { push ", " }
+			end
 		end
 
 		visit MultiWriteNode do |node|
@@ -991,6 +1032,18 @@ module Refract
 		end
 
 		visit ProgramNode do |node|
+			@escape_non_ascii = node.encoding && node.encoding != Encoding::UTF_8
+
+			if node.encoding && node.encoding != Encoding::UTF_8
+				push "# encoding: #{node.encoding.name}"
+				new_line
+			end
+
+			unless node.frozen_string_literal.nil?
+				push "# frozen_string_literal: #{node.frozen_string_literal}"
+				new_line
+			end
+
 			visit node.statements
 		end
 
@@ -1001,12 +1054,7 @@ module Refract
 		end
 
 		visit RationalNode do |node|
-			if node.denominator == 1
-				push node.numerator.to_s
-				push "r"
-			else
-				push "#{(node.numerator.to_f / node.denominator)}r"
-			end
+			push rational(node.numerator, node.denominator)
 		end
 
 		visit RedoNode do |node|
@@ -1081,7 +1129,11 @@ module Refract
 		end
 
 		visit ShareableConstantNode do |node|
-			visit node.write
+			if @stack.length == 1
+				shareable_constant_value(node.value) { visit node.write }
+			else
+				visit node.write
+			end
 		end
 
 		visit SingletonClassNode do |node|
@@ -1107,7 +1159,7 @@ module Refract
 		end
 
 		visit SourceLineNode do |node|
-			push "__LINE__"
+			push node.start_line&.to_s || "__LINE__"
 		end
 
 		visit SplatNode do |node|
@@ -1116,7 +1168,7 @@ module Refract
 		end
 
 		visit StatementsNode do |node|
-			visit_each(node.body.flat_map { |n| (Refract::StatementsNode === n) ? n.body : n }) { new_line }
+			visit_each(flatten_statements(node.body)) { new_line }
 		end
 
 		visit StringNode do |node|
@@ -1125,33 +1177,20 @@ module Refract
 
 		visit SuperNode do |node|
 			push "super"
-			case node.block
-			when BlockNode
-				if node.arguments
-					parens { visit node.arguments }
-				end
 
+			parens do
+				visit_each([node.arguments, (node.block if BlockArgumentNode === node.block)]) { push ", " }
+			end
+
+			if BlockNode === node.block
 				space
 				visit node.block
-			when BlockArgumentNode
-				parens do
-					if node.arguments
-						visit node.arguments
-						push ", "
-					end
-
-					visit node.block
-				end
-			else
-				if node.arguments
-					parens { visit node.arguments }
-				end
 			end
 		end
 
 		visit SymbolNode do |node|
 			push ":"
-			if node.quoted || !node.unescaped.match?(BARE_SYMBOL)
+			if node.quoted || !bare?(node.unescaped, BARE_SYMBOL)
 				push quote(node.unescaped)
 			else
 				push node.unescaped
@@ -1174,22 +1213,24 @@ module Refract
 				push " unless "
 				visit node.predicate
 			else
-				push "unless "
-				visit node.predicate
+				parenthesize(modifier_ambiguous?) do
+					push "unless "
+					visit node.predicate
 
-				if node.statements
-					indent do
-						visit node.statements
+					if node.statements
+						indent do
+							visit node.statements
+						end
 					end
-				end
 
-				if node.else_clause
+					if node.else_clause
+						new_line
+						visit node.else_clause
+					end
+
 					new_line
-					visit node.else_clause
+					push "end"
 				end
-
-				new_line
-				push "end"
 			end
 		end
 
@@ -1199,15 +1240,17 @@ module Refract
 				push " until "
 				visit node.predicate
 			else
-				push "until "
-				visit node.predicate
-				if node.statements
-					indent do
-						visit node.statements
+				parenthesize(modifier_ambiguous?) do
+					push "until "
+					visit node.predicate
+					if node.statements
+						indent do
+							visit node.statements
+						end
 					end
+					new_line
+					push "end"
 				end
-				new_line
-				push "end"
 			end
 		end
 
@@ -1226,15 +1269,17 @@ module Refract
 				push " while "
 				visit node.predicate
 			else
-				push "while "
-				visit node.predicate
-				if node.statements
-					indent do
-						visit node.statements
+				parenthesize(modifier_ambiguous?) do
+					push "while "
+					visit node.predicate
+					if node.statements
+						indent do
+							visit node.statements
+						end
 					end
+					new_line
+					push "end"
 				end
-				new_line
-				push "end"
 			end
 		end
 
@@ -1261,6 +1306,7 @@ module Refract
 				value.name
 			end
 
+			@current_line += string.count("\n") if string
 			@buffer << string
 		end
 
@@ -1320,8 +1366,140 @@ module Refract
 			push '"'
 		end
 
+		private def rational(numerator, denominator)
+			rest, twos, fives = denominator, 0, 0
+			(rest /= 2) && (twos += 1) while rest.even?
+			(rest /= 5) && (fives += 1) while (rest % 5).zero?
+			return "(#{numerator}r/#{denominator})" unless rest == 1
+
+			places = [twos, fives].max
+			digits = (numerator.abs * (10 ** places) / denominator).to_s.rjust(places + 1, "0")
+			sign = numerator.negative? ? "-" : ""
+
+			if places.zero?
+				"#{sign}#{digits}r"
+			else
+				"#{sign}#{digits[0...-places]}.#{digits[-places..]}r"
+			end
+		end
+
+		private def shorthand?(key, value)
+			case value
+			when LocalVariableReadNode, LocalVariableTargetNode, ConstantReadNode
+				value.name.name == key.unescaped
+			when CallNode
+				value.name.name == key.unescaped && !value.receiver && !value.arguments && !value.block
+			else
+				false
+			end
+		end
+
+		private def map_source_and_visit(node)
+			if (start_line = @stack.reverse_each.lazy.filter_map(&:start_line).first)
+				@source_map[@current_line] ||= start_line
+			end
+
+			yield(node)
+		end
+
+		# A statement on lines of its own, so a magic comment can go before and after it.
+		private def statement?(node)
+			StatementsNode === @stack[-2] && !inline_statements?(@stack[-3])
+		end
+
+		private def inline_statements?(parent)
+			case parent
+			when IfNode, UnlessNode, WhileNode, UntilNode
+				parent.inline
+			when ParenthesesNode, EmbeddedStatementsNode
+				true
+			else
+				false
+			end
+		end
+
+		private def shareable_constant_value_within(node)
+			case node
+			when ShareableConstantNode
+				return node.value
+			when ConstantWriteNode, ConstantOrWriteNode, ConstantAndWriteNode, ConstantOperatorWriteNode,
+					ConstantPathWriteNode, ConstantPathOrWriteNode, ConstantPathAndWriteNode, ConstantPathOperatorWriteNode
+
+				return :none
+			end
+
+			node.class.attributes.each do |name|
+				Array(node.public_send(name)).each do |child|
+					next unless Node === child
+					next if StatementsNode === child && !inline_statements?(node)
+
+					value = shareable_constant_value_within(child)
+					return value if value
+				end
+			end
+
+			nil
+		end
+
+		private def shareable_constant_value(value)
+			previous = @shareable_constant_value
+			@shareable_constant_value = value
+
+			push "# shareable_constant_value: #{value}"
+			new_line
+			yield
+			new_line
+			push "# shareable_constant_value: #{previous}"
+		ensure
+			@shareable_constant_value = previous
+		end
+
+		private def bare?(name, pattern)
+			name.valid_encoding? && (name.ascii_only? || !@escape_non_ascii) && name.match?(pattern)
+		end
+
+		private def low_precedence?(node)
+			case node
+			when AndNode, OrNode, RescueModifierNode, RangeNode, FlipFlopNode, MatchPredicateNode, MatchRequiredNode, ShareableConstantNode
+				true
+			when IfNode, UnlessNode, WhileNode, UntilNode
+				node.inline
+			when CallNode
+				node.attribute_write
+			else
+				node.type.end_with?("write_node")
+			end
+		end
+
+		private def call_receiver(node)
+			return unless node.receiver
+
+			parenthesize(low_precedence?(node.receiver)) { visit node.receiver }
+			push "&" if node.safe_navigation
+			push "."
+		end
+
+		private def parenthesize(condition, &)
+			condition ? parens(&) : yield
+		end
+
+		# `return`, `break`, `next` and `rescue` are complete on their own, so a
+		# keyword expression after them would be read as a modifier.
+		private def modifier_ambiguous?
+			case @stack[-2]
+			when RescueNode
+				true
+			when RescueModifierNode
+				@stack[-2].rescue_expression.equal?(@stack[-1])
+			when ArgumentsNode
+				ReturnNode === @stack[-3] || BreakNode === @stack[-3] || NextNode === @stack[-3]
+			else
+				false
+			end
+		end
+
 		private def quote(string)
-			if string.include?('"') && string.valid_encoding? && !string.match?(/['\\]|[^[:print:]]/)
+			if string.include?('"') && string.valid_encoding? && (string.ascii_only? || !@escape_non_ascii) && !string.match?(/['\\]|[^[:print:]]/)
 				"'#{string}'"
 			else
 				%("#{escape_string(string, '"')}")
@@ -1331,10 +1509,13 @@ module Refract
 		private def escape_string(string, delimiter)
 			string = string.b unless string.encoding == Encoding::UTF_8 && string.valid_encoding?
 
-			string.gsub(ESCAPE_PATTERNS.fetch(delimiter)) do |char|
+			pattern = ESCAPE_PATTERNS.fetch(delimiter)
+			pattern = Regexp.union(pattern, NON_ASCII) if @escape_non_ascii
+
+			string.gsub(pattern) do |char|
 				if (escape = STRING_ESCAPES[char])
 					escape
-				elsif char.match?(/[[:print:]]/)
+				elsif char.bytesize == 1 && char.match?(/[[:print:]]/)
 					"\\#{char}"
 				elsif char.bytesize == 1
 					format("\\x%02X", char.ord)
@@ -1346,7 +1527,7 @@ module Refract
 
 		private def escape_regexp(string)
 			string = string.b unless string.valid_encoding?
-			string.gsub(/\\.|\/|#(?=[{@$])/m) { |match| (match.length == 2) ? match : "\\#{match}" }
+			string.gsub(%r{\\.|/|#{REGEXP_INTERPOLATION}}m) { |match| (match.length == 2) ? match : "\\#{match}" }
 		end
 
 		private def regexp_flags(node)
@@ -1367,6 +1548,10 @@ module Refract
 						visit chunk.first
 					end
 				end
+		end
+
+		private def flatten_statements(body)
+			body.flat_map { |statement| (StatementsNode === statement) ? flatten_statements(statement.body) : statement }
 		end
 
 		private def flatten_parts(parts)

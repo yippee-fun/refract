@@ -164,10 +164,11 @@ test "source file" do
 	RUBY
 end
 
-test "source line" do
-	assert_refract <<~RUBY
-		__LINE__
-	RUBY
+test "source line keeps its original value" do
+	assert_formats "\n\nfoo(__LINE__)", "foo(3)"
+
+	synthesized = Refract::SourceLineNode.new
+	assert_equal Refract::Formatter.new.format_node(synthesized).source, "__LINE__"
 end
 
 test "defined" do
@@ -1061,7 +1062,7 @@ def assert_round_trip(input)
 	end
 
 	refute(result.mismatch) do
-		"Round trip changed meaning at #{result.mismatch.path.join(" > ")}:\n#{result.source}\n" \
+		"Round trip changed meaning at #{result.mismatch.path.join(' > ')}:\n#{result.source}\n" \
 			"original:    #{result.mismatch.original.inspect}\nregenerated: #{result.mismatch.regenerated.inspect}"
 	end
 end
@@ -1155,7 +1156,7 @@ test "operator and sigil symbols stay bare" do
 end
 
 test "hash keys that are not valid labels are quoted" do
-	assert_formats %q{{:+ => 1, :a= => 2, :@a => 3, :"a b" => 4, a?: 5}}, <<~'RUBY'
+	assert_formats %q{{:+ => 1, :a= => 2, :@a => 3, :"a b" => 4, a?: 5}}, <<~RUBY
 		{
 			"+": 1,
 			"a=": 2,
@@ -1197,4 +1198,351 @@ end
 test "regular expressions in conditions" do
 	assert_formats "if %r{a/b}n\n\tc\nend", "if /a\\/b/n\n\tc\nend"
 	assert_formats "if %r{\#{a}/b}i\n\tc\nend", "if /\#{a}\\/b/i\n\tc\nend"
+end
+
+test "frozen string literal magic comment" do
+	assert_formats "# frozen_string_literal: true\nx = \"a\"", "# frozen_string_literal: true\nx = \"a\""
+	assert_formats "# frozen_string_literal: false\nx = \"a\"", "# frozen_string_literal: false\nx = \"a\""
+	assert_formats "# frozen_string_literal: true\nx = __FILE__", "# frozen_string_literal: true\nx = __FILE__"
+	assert_formats "# frozen_string_literal: true\nx = \"a\#{b}\"", "x = \"a\#{b}\""
+	assert_formats "# frozen_string_literal: true\nx = 1", "x = 1"
+end
+
+test "source encoding magic comment" do
+	assert_formats "# encoding: binary\nx = \"\\xFF\"", "# encoding: ASCII-8BIT\nx = \"\\xFF\""
+	assert_formats "# encoding: us-ascii\nx = 1", "# encoding: US-ASCII\nx = 1"
+end
+
+test "receiverless calls without arguments keep their parentheses" do
+	assert_formats "a = 1\na()", "a = 1\na()"
+	assert_formats "Foo()", "Foo()"
+	assert_formats "foo", "foo"
+	assert_formats "foo?", "foo?"
+	assert_formats "foo { }", "foo {\n\t\n}"
+end
+
+test "attribute writes use assignment syntax" do
+	assert_formats "a.b = 1", "a.b = 1"
+	assert_formats "a.b = (1)", "a.b = (1)"
+	assert_formats "a&.b = 1", "a&.b = 1"
+	assert_formats "a.b=(1)", "a.b = (1)"
+	assert_formats "x = (a.b = 1)", "x = (a.b = 1)"
+end
+
+test "index writes use assignment syntax" do
+	assert_formats "a[1] = 2", "a[1] = 2"
+	assert_formats "a[1, 2] = 3", "a[1, 2] = 3"
+	assert_formats "a[] = 1", "a[] = 1"
+	assert_formats "a[*b] = 1", "a[*b] = 1"
+end
+
+test "call operator writes keep safe navigation" do
+	assert_formats "a&.b += 1", "a&.b += 1"
+	assert_formats "a&.b ||= 1", "a&.b ||= 1"
+	assert_formats "a&.b &&= 1", "a&.b &&= 1"
+end
+
+test "super with explicit empty arguments" do
+	assert_formats "super()", "super()"
+	assert_formats "super() { }", "super() {\n\t\n}"
+	assert_formats "super(&b)", "super(&b)"
+	assert_formats "super(a) { }", "super(a) {\n\t\n}"
+	assert_formats "super", "super"
+end
+
+test "nested multi targets keep their parentheses" do
+	assert_formats "def foo((a, b)); end", "def foo((a, b))\nend"
+	assert_formats "a, (b, c) = 1", "a, (b, c) = 1"
+	assert_formats "a, (b,) = 1", "a, (b, ) = 1"
+	assert_formats "foo { |(a, b), c| }", "foo { |(a, b), c|\n\t\n}"
+	assert_formats "for a, b in c; end", "for a, b in c\n\t\nend"
+end
+
+test "array patterns keep rest and posts" do
+	assert_formats "case x; in [a, *b, c]; end", "case x\nin [a, *b, c]\nend"
+	assert_formats "case x; in [*, {a:}]; end", "case x\nin [*, { a: }]\nend"
+	assert_formats "case x; in Foo(a, *); end", "case x\nin Foo[a, *]\nend"
+end
+
+test "hash patterns keep their constant" do
+	assert_formats "case x; in Foo(a:); end", "case x\nin Foo[a:]\nend"
+	assert_formats "case x; in Foo::Bar[a: 1, **rest]; end", "case x\nin Foo::Bar[a: 1, **rest]\nend"
+end
+
+test "match write uses the operator so named captures assign locals" do
+	assert_formats "/(?<x>.)/ =~ y\nx", "/(?<x>.)/ =~ y\nx"
+end
+
+test "rational literals are exact" do
+	assert_formats "1.0000000000000001r", "1.0000000000000001r"
+	assert_formats "0.001r", "0.001r"
+	assert_formats "-2.5r", "-2.5r"
+	assert_formats "3r", "3r"
+
+	synthesized = Refract::RationalNode.new(numerator: 1, denominator: 3)
+	assert_equal Refract::Formatter.new.format_node(synthesized).source, "(1r/3)"
+end
+
+test "if inside the predicate of another if is not an elsif" do
+	assert_formats "if (a ? b : c) then d end", "if (if a\n\tb\nelse\n\tc\nend)\n\td\nend"
+	assert_formats "if a ? b : c then d end", "if if a\n\tb\nelse\n\tc\nend\n\td\nend"
+end
+
+test "keyword expressions after return, break, next and rescue are parenthesized" do
+	assert_formats "return a ? b : c", "return (if a\n\tb\nelse\n\tc\nend)"
+	assert_formats "foo { next a ? b : c }", "foo {\n\tnext (if a\n\t\tb\n\telse\n\t\tc\n\tend)\n}"
+	assert_formats "foo { break a ? b : c }", "foo {\n\tbreak (if a\n\t\tb\n\telse\n\t\tc\n\tend)\n}"
+	assert_formats "x rescue a ? b : c", "x rescue (if a\n\tb\nelse\n\tc\nend)"
+	assert_formats "begin\nrescue a ? B : C\nend", "begin\n\t\nrescue (if a\n\tB\nelse\n\tC\nend)\nend"
+end
+
+test "alias of a back reference" do
+	assert_formats "alias $MATCH $&", "alias $MATCH $&"
+end
+
+test "hash sign before characters that do not start interpolation is not escaped" do
+	assert_formats %q{"#$% #@1 #{a}"}, %q{"\#$% \#@1 #{a}"}
+	assert_formats %q{/[#$%]/}, %q{/[#$%]/}
+	assert_formats %q{'#$1 #@@a #@b'}, %q{"\#$1 \#@@a \#@b"}
+end
+
+def source_map(input)
+	node = Refract::Converter.new.visit(Prism.parse(input).value)
+	Refract::Formatter.new.format_node(node).source_map
+end
+
+test "source map points each generated line at the outermost node that starts on it" do
+	assert_equal source_map("foo(\n\tbar,\n\tbaz\n)"), [nil, 1]
+	assert_equal source_map("a\n\nb"), [nil, 1, 3]
+end
+
+test "source map does not drift after strings that contain newlines" do
+	assert_equal source_map("x = <<~EOS\n\ta\n\tb\nEOS\ny"), [nil, 1, 5]
+	assert_equal source_map("x = /a\nb/x\ny"), [nil, 1, nil, 3]
+end
+
+test "source map accounts for magic comments" do
+	assert_equal source_map("# frozen_string_literal: true\n\"a\""), [nil, 2, 2]
+end
+
+test "source map starting line" do
+	node = Refract::Converter.new.visit(Prism.parse("a\nb").value)
+	assert_equal Refract::Formatter.new(starting_line: 10).format_node(node).source_map[10..], [1, 2]
+end
+
+test "source map covers synthesized nodes with their nearest original ancestor" do
+	program = Refract::Converter.new.visit(Prism.parse("def foo\n\tbar\nend").value)
+	definition = program.statements.body.first
+	synthesized = Refract::CallNode.new(name: :baz, variable_call: true)
+	body = definition.body.copy(body: [*definition.body.body, synthesized])
+	program = program.copy(statements: program.statements.copy(body: [definition.copy(body:)]))
+
+	result = Refract::Formatter.new.format_node(program)
+	assert_equal result.source, "def foo\n\tbar\n\tbaz\nend"
+	assert_equal result.source_map, [nil, 1, 2, 2]
+end
+
+test "empty nested statements do not produce blank lines" do
+	statements = Refract::StatementsNode.new(
+		body: [
+			Refract::CallNode.new(name: :a, variable_call: true),
+			Refract::StatementsNode.new(body: [Refract::StatementsNode.new(body: [])]),
+			Refract::MissingNode.new,
+			Refract::CallNode.new(name: :b, variable_call: true),
+		],
+	)
+
+	assert_equal Refract::Formatter.new.format_node(statements).source, "a\nb"
+end
+
+test "visitor stack is restored when a visit raises" do
+	visitor = Class.new(Refract::Visitor) do
+		attr_reader :stack
+
+		visit Refract::CallNode do |node|
+			raise ArgumentError
+		end
+	end.new
+
+	node = Refract::Converter.new.visit(Prism.parse("[foo]").value)
+	assert_raises(ArgumentError) { visitor.visit(node) }
+	assert_equal visitor.stack, []
+end
+
+test "nodes support hash patterns" do
+	node = Refract::Converter.new.visit(Prism.parse("foo(1)").value).statements.body.first
+
+	assert((node in Refract::CallNode[name: :foo, receiver: nil]))
+	refute((node in { name: :bar }))
+	assert_equal node.deconstruct_keys([:name, :missing]), { name: :foo }
+	assert_equal Refract::NilNode.new.deconstruct_keys(nil), {}
+end
+
+test "nodes have a short inspect" do
+	node = Refract::CallNode.new(name: :foo, arguments: Refract::ArgumentsNode.new(arguments: [Refract::NilNode.new]))
+	assert_equal node.inspect, "#<Refract::CallNode name: :foo, receiver: nil, arguments: #<Refract::ArgumentsNode arguments: [#<Refract::NilNode>]>, block: nil, safe_navigation: nil, variable_call: nil, attribute_write: nil>"
+end
+
+test "every node is frozen" do
+	Refract::Loader.eager_load
+	program = Refract::Converter.new.visit(Prism.parse("nil; self; true; false; __FILE__; __LINE__; __ENCODING__; -> { it }; -> { _1 }; def a(...) = b(...); def c(**nil) = 1; redo; retry").value)
+
+	nodes = []
+	collect = -> (node) do
+		nodes << node
+		node.class.attributes.each do |name|
+			Array(node.public_send(name)).each { |child| collect.(child) if Refract::Node === child }
+		end
+	end
+	collect.(program)
+
+	assert_equal nodes.reject(&:frozen?), []
+end
+
+test "mutation visitor handles constant and-write and operator-write" do
+	node = Refract::Converter.new.visit(Prism.parse("A &&= 1\nB += 2").value)
+	result = Refract::MutationVisitor.new.visit(node)
+	assert_equal Refract::Formatter.new.format_node(result).source, "A &&= 1\nB += 2"
+end
+
+test "renaming the value of shorthand hash syntax expands it" do
+	renamer = Class.new(Refract::MutationVisitor) do
+		visit Refract::LocalVariableReadNode do |node|
+			node.copy(name: :renamed)
+		end
+	end
+
+	node = Refract::Converter.new.visit(Prism.parse("a = 1\nfoo(a:)").value)
+	result = renamer.new.visit(node)
+	assert_equal Refract::Formatter.new.format_node(result).source, "a = 1\nfoo(a: renamed)"
+	assert_equal Refract::Formatter.new.format_node(node).source, "a = 1\nfoo(a:)"
+end
+
+test "requiring refract on its own loads prism" do
+	output = IO.popen([RbConfig.ruby, "-I", File.expand_path("../lib", __dir__), "-e", "require 'refract'; p Refract::Converter.new.visit(Prism.parse('1').value).type"], err: [:child, :out], &:read)
+	assert_equal output, "\"program_node\"\n"
+end
+
+test "symbols that Ruby would normalize are quoted" do
+	assert_formats %q{%i[!@ ~@ +@]}, "[\n\t:\"!@\",\n\t:\"~@\",\n\t:+@\n]"
+	assert_formats %q{:!@}, %q{:!}
+end
+
+test "hash signs followed by a closing delimiter do not become interpolation" do
+	assert_formats %q{'#$'}, %q{"\#$"}
+	assert_formats %q{'#@'}, %q{"\#@"}
+	assert_formats %q{%r{#$}}, %q{/\#$/}
+	assert_formats %q{%x(#$)}, %q{`\#$`}
+end
+
+test "explicit index assignment calls keep method syntax" do
+	assert_formats "a.[]=(1, 2)", "a.[]=(1, 2)"
+
+	synthesized = Refract::CallNode.new(
+		receiver: Refract::CallNode.new(name: :a, variable_call: true),
+		name: :[]=,
+		arguments: Refract::ArgumentsNode.new(arguments: [Refract::IntegerNode.new(value: 1), Refract::IntegerNode.new(value: 2)]),
+	)
+	assert_equal Refract::Formatter.new.format_node(synthesized).source, "a.[]=(1, 2)"
+end
+
+test "shareable constant value directive" do
+	assert_formats "# shareable_constant_value: literal\nA = [1]\nB = 2", <<~RUBY
+		# shareable_constant_value: literal
+		A = [
+			1
+		]
+		# shareable_constant_value: none
+		# shareable_constant_value: literal
+		B = 2
+		# shareable_constant_value: none
+	RUBY
+
+	assert_formats "# shareable_constant_value: experimental_copy\nclass A\n\tB = []\nend\nC = []", <<~RUBY
+		class A
+			# shareable_constant_value: experimental_copy
+			B = [
+				
+			]
+			# shareable_constant_value: none
+		end
+		# shareable_constant_value: experimental_copy
+		C = [
+			
+		]
+		# shareable_constant_value: none
+	RUBY
+end
+
+test "strings in when clauses and hash keys do not imply frozen_string_literal" do
+	assert_formats "case a\nwhen \"b\" then {\"c\" => \"d\"}\nend", "case a\nwhen \"b\"\n\t{\n\t\t\"c\" => \"d\"\n\t}\nend"
+end
+
+test "shareable constant value directive is hoisted to the enclosing statement" do
+	assert_formats "# shareable_constant_value: literal\nA = [] if false", <<~RUBY
+		# shareable_constant_value: literal
+		A = [
+			
+		] if false
+		# shareable_constant_value: none
+	RUBY
+
+	assert_formats "# shareable_constant_value: literal\n(A = 1).freeze", <<~RUBY
+		# shareable_constant_value: literal
+		(A = 1).freeze
+		# shareable_constant_value: none
+	RUBY
+end
+
+test "low precedence receivers are parenthesized" do
+	assert_formats "not(a and b)", "(a and b).!"
+	assert_formats "not x = y", "(x = y).!"
+	assert_formats "(a.b = 1).c", "(a.b = 1).c"
+end
+
+test "unicode escapes in a non UTF-8 source stay escaped" do
+	assert_formats "# coding: us-ascii\nx = \"\\u00e9\" \"\\u0300\"", "# encoding: US-ASCII\nx = \"\\u{E9}\\u{300}\""
+	assert_formats "# coding: us-ascii\nx = :\"\\u00e9\"", "# encoding: US-ASCII\nx = :\"\\u{E9}\""
+end
+
+test "a lone string in interpolation does not imply frozen_string_literal" do
+	assert_formats "x = \"a\#{' '}\"", "x = \"a\#{\" \"}\""
+end
+
+test "adjacent literals keep the encoding of their non-ASCII parts" do
+	assert_round_trip "# coding: us-ascii\nx = \"\" \"[\\u0300\" \"]\""
+end
+
+test "non-ASCII bare symbols are quoted in a non UTF-8 source" do
+	assert_formats "# coding: US-ASCII\nx = %I[\\u00e9]", "# encoding: US-ASCII\nx = [\n\t:\"\\u{E9}\"\n]"
+end
+
+test "a mutable interpolated string does not imply frozen_string_literal: false" do
+	assert_formats "# frozen_string_literal: true\nx = \"\#{'a'}\"\ny = 'b'", "# frozen_string_literal: true\nx = \"\#{\"a\"}\"\ny = \"b\""
+end
+
+test "nested shareable constant value directives restore the enclosing value" do
+	assert_formats "# shareable_constant_value: literal\nA = [begin\n\tB = 1\nend]", <<~RUBY
+		# shareable_constant_value: literal
+		A = [
+			begin
+				# shareable_constant_value: literal
+				B = 1
+				# shareable_constant_value: literal
+			end
+		]
+		# shareable_constant_value: none
+	RUBY
+
+	assert_formats "# shareable_constant_value: literal\nif A = 1\n\t# shareable_constant_value: none\n\tB = []\nend", <<~RUBY
+		# shareable_constant_value: literal
+		if A = 1
+			# shareable_constant_value: none
+			B = [
+				
+			]
+			# shareable_constant_value: literal
+		end
+		# shareable_constant_value: none
+	RUBY
 end
