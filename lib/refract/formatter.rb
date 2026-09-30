@@ -50,6 +50,7 @@ module Refract
 			super()
 			@buffer = []
 			@source_map = []
+			@inferred_lines = Set.new
 			@current_line = starting_line
 			@indent = 0
 			@shareable_constant_value = :none
@@ -1394,9 +1395,17 @@ module Refract
 			end
 		end
 
+		# The outermost located node that starts on a line claims it. A node
+		# without a location only fills an unclaimed line, with the line of its
+		# nearest located ancestor, until a located node starts there.
 		private def map_source_and_visit(node)
-			if (start_line = @stack.reverse_each.lazy.filter_map(&:start_line).first)
-				@source_map[@current_line] ||= start_line
+			if (start_line = node.start_line)
+				if @source_map[@current_line].nil? || @inferred_lines.delete?(@current_line)
+					@source_map[@current_line] = start_line
+				end
+			elsif @source_map[@current_line].nil? && (start_line = @stack.reverse_each.lazy.filter_map(&:start_line).first)
+				@source_map[@current_line] = start_line
+				@inferred_lines << @current_line
 			end
 
 			yield(node)

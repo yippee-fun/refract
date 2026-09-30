@@ -1342,6 +1342,28 @@ test "source map covers synthesized nodes with their nearest original ancestor" 
 	assert_equal result.source_map, [nil, 1, 2, 2]
 end
 
+test "source map prefers a located node over synthesized wrappers on the same line" do
+	program = Refract::Converter.new.visit(Prism.parse("def foo\n\tbar\n\n\tbaz\nend").value)
+	definition = program.statements.body.first
+	bar, baz = definition.body.body
+
+	wrapped = Refract::IfNode.new(
+		predicate: Refract::TrueNode.new,
+		statements: Refract::StatementsNode.new(
+			body: [Refract::ParenthesesNode.new(body: Refract::StatementsNode.new(body: [baz]))],
+		),
+		inline: true,
+	)
+	synthesized = Refract::CallNode.new(name: :qux, variable_call: true)
+
+	body = definition.body.copy(body: [bar, wrapped, synthesized])
+	program = program.copy(statements: program.statements.copy(body: [definition.copy(body:)]))
+
+	result = Refract::Formatter.new.format_node(program)
+	assert_equal result.source, "def foo\n\tbar\n\t(baz) if true\n\tqux\nend"
+	assert_equal result.source_map, [nil, 1, 2, 4, 2]
+end
+
 test "empty nested statements do not produce blank lines" do
 	statements = Refract::StatementsNode.new(
 		body: [
