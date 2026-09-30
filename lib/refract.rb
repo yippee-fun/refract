@@ -71,4 +71,8 @@ module Refract
 			duplicate.freeze
 		end
 	end
+
+	def format_node(node)
+		Formatter.new.format_node(node).source
+	end
 end
