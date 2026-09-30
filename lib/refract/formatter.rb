@@ -4,6 +4,40 @@ module Refract
 	class Formatter < BasicVisitor
 		Result = Data.define(:source, :source_map)
 
+		IDENTIFIER = /(?:[A-Za-z_]|[^\x00-\x7F])(?:\w|[^\x00-\x7F])*/
+		LABEL = /\A#{IDENTIFIER}[?!]?\z/
+		BARE_SYMBOL = %r{
+			\A(?:
+				#{IDENTIFIER}[?!=]?
+				| @@?#{IDENTIFIER}
+				| \$(?:#{IDENTIFIER}|-\w|\d+|[~*$?!@/\\;,.=:<>"&`'+])
+				| \[\]=? | [+\-~!]@? | \*\*? | [/%&|^`] | <=> | ===? | =~ | !~ | != | <[<=]? | >[>=]?
+			)\z
+		}x
+
+		STRING_ESCAPES = {
+			"\n" => "\\n",
+			"\t" => "\\t",
+			"\r" => "\\r",
+			"\f" => "\\f",
+			"\v" => "\\v",
+			"\a" => "\\a",
+			"\b" => "\\b",
+			"\e" => "\\e",
+		}.freeze
+
+		ESCAPE_PATTERNS = {
+			'"' => /[\\"]|#(?=[{@$])|[^[:print:]]/,
+			"`" => /[\\`]|#(?=[{@$])|[^[:print:]]/,
+		}.freeze
+
+		REGEXP_ENCODINGS = {
+			ascii_8bit: "n",
+			euc_jp: "e",
+			windows_31j: "s",
+			utf_8: "u",
+		}.freeze
+
 		def initialize(starting_line: 1)
 			super()
 			@buffer = []
@@ -83,10 +117,8 @@ module Refract
 		visit AssocNode do |node|
 			case node.key
 			when SymbolNode
-				if node.key.quoted
-					doubles do
-						push node.key.unescaped.gsub('"', '\"')
-					end
+				if node.key.quoted || !node.key.unescaped.match?(LABEL)
+					push quote(node.key.unescaped)
 				else
 					push node.key.unescaped
 				end
@@ -706,70 +738,34 @@ module Refract
 
 		visit InterpolatedMatchLastLineNode do |node|
 			push "/"
-			node.parts.each do |part|
-				case part
-				when StringNode
-					push part.unescaped.gsub("/", "\\/")
-				else
-					visit part
-				end
-			end
+			visit_parts(node.parts) { |string| push escape_regexp(string) }
 			push "/"
+			regexp_flags(node)
 		end
 
 		visit InterpolatedRegularExpressionNode do |node|
 			push "/"
-			node.parts.each do |part|
-				case part
-				when StringNode
-					push part.unescaped.gsub("/", "\\/")
-				else
-					visit part
-				end
-			end
+			visit_parts(node.parts) { |string| push escape_regexp(string) }
 			push "/"
-			push "i" if node.ignore_case
-			push "m" if node.multi_line
-			push "x" if node.extended
-			push "o" if node.once
+			regexp_flags(node)
 		end
 
 		visit InterpolatedStringNode do |node|
 			doubles do
-				node.parts.each do |part|
-					case part
-					when StringNode
-						push part.unescaped.gsub('"', '\"')
-					else
-						visit part
-					end
-				end
+				visit_parts(node.parts) { |string| push escape_string(string, '"') }
 			end
 		end
 
 		visit InterpolatedSymbolNode do |node|
-			push ':"'
-			node.parts.each do |part|
-				case part
-				when StringNode
-					push part.unescaped.gsub('"', '\"')
-				else
-					visit part
-				end
+			push ":"
+			doubles do
+				visit_parts(node.parts) { |string| push escape_string(string, '"') }
 			end
-			push '"'
 		end
 
 		visit InterpolatedXStringNode do |node|
 			push "`"
-			node.parts.each do |part|
-				case part
-				when StringNode
-					push part.unescaped.gsub("`", "\\`")
-				else
-					visit part
-				end
-			end
+			visit_parts(node.parts) { |string| push escape_string(string, "`") }
 			push "`"
 		end
 
@@ -853,12 +849,9 @@ module Refract
 
 		visit MatchLastLineNode do |node|
 			push "/"
-			push node.unescaped.gsub("/", '\\/')
+			push escape_regexp(node.unescaped)
 			push "/"
-			push "i" if node.ignore_case
-			push "m" if node.multi_line
-			push "x" if node.extended
-			push "o" if node.once
+			regexp_flags(node)
 		end
 
 		visit MatchPredicateNode do |node|
@@ -1022,12 +1015,9 @@ module Refract
 
 		visit RegularExpressionNode do |node|
 			push "/"
-			push node.unescaped.gsub("/", '\\/')
+			push escape_regexp(node.unescaped)
 			push "/"
-			push "i" if node.ignore_case
-			push "m" if node.multi_line
-			push "x" if node.extended
-			push "o" if node.once
+			regexp_flags(node)
 		end
 
 		visit RequiredKeywordParameterNode do |node|
@@ -1130,9 +1120,7 @@ module Refract
 		end
 
 		visit StringNode do |node|
-			doubles do
-				push node.unescaped.gsub('"', '\"')
-			end
+			push quote(node.unescaped)
 		end
 
 		visit SuperNode do |node|
@@ -1163,10 +1151,8 @@ module Refract
 
 		visit SymbolNode do |node|
 			push ":"
-			if node.quoted
-				doubles do
-					push node.unescaped.gsub('"', '\"')
-				end
+			if node.quoted || !node.unescaped.match?(BARE_SYMBOL)
+				push quote(node.unescaped)
 			else
 				push node.unescaped
 			end
@@ -1254,7 +1240,7 @@ module Refract
 
 		visit XStringNode do |node|
 			push "`"
-			push node.unescaped
+			push escape_string(node.unescaped, "`")
 			push "`"
 		end
 
@@ -1332,6 +1318,59 @@ module Refract
 			push '"'
 			yield
 			push '"'
+		end
+
+		private def quote(string)
+			if string.include?('"') && string.valid_encoding? && !string.match?(/['\\]|[^[:print:]]/)
+				"'#{string}'"
+			else
+				%("#{escape_string(string, '"')}")
+			end
+		end
+
+		private def escape_string(string, delimiter)
+			string = string.b unless string.encoding == Encoding::UTF_8 && string.valid_encoding?
+
+			string.gsub(ESCAPE_PATTERNS.fetch(delimiter)) do |char|
+				if (escape = STRING_ESCAPES[char])
+					escape
+				elsif char.match?(/[[:print:]]/)
+					"\\#{char}"
+				elsif char.bytesize == 1
+					format("\\x%02X", char.ord)
+				else
+					format("\\u{%X}", char.ord)
+				end
+			end
+		end
+
+		private def escape_regexp(string)
+			string = string.b unless string.valid_encoding?
+			string.gsub(/\\.|\/|#(?=[{@$])/m) { |match| (match.length == 2) ? match : "\\#{match}" }
+		end
+
+		private def regexp_flags(node)
+			push "i" if node.ignore_case
+			push "m" if node.multi_line
+			push "x" if node.extended
+			push "o" if node.once
+			push REGEXP_ENCODINGS.fetch(node.encoding) if node.encoding
+		end
+
+		private def visit_parts(parts)
+			flatten_parts(parts)
+				.chunk_while { |a, b| StringNode === a && StringNode === b }
+				.each do |chunk|
+					if StringNode === chunk.first
+						yield chunk.map(&:unescaped).join
+					else
+						visit chunk.first
+					end
+				end
+		end
+
+		private def flatten_parts(parts)
+			parts.flat_map { |part| (InterpolatedStringNode === part) ? flatten_parts(part.parts) : part }
 		end
 	end
 end

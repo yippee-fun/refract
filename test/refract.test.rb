@@ -1052,3 +1052,149 @@ def assert_refract(input)
 	assert_equal_ruby result, input.strip
 	assert_equal result, input.strip
 end
+
+def assert_round_trip(input)
+	result = SemanticTree.round_trip(input)
+
+	assert(result.errors.empty?) do
+		"Regenerated source has syntax errors:\n#{result.source}\n#{result.errors.map(&:message).join("\n")}"
+	end
+
+	refute(result.mismatch) do
+		"Round trip changed meaning at #{result.mismatch.path.join(" > ")}:\n#{result.source}\n" \
+			"original:    #{result.mismatch.original.inspect}\nregenerated: #{result.mismatch.regenerated.inspect}"
+	end
+end
+
+def assert_formats(input, expected)
+	tree = Prism.parse(input).value
+	node = Refract::Converter.new.visit(tree)
+	assert_equal Refract::Formatter.new.format_node(node).source, expected.strip
+	assert_round_trip(input)
+end
+
+test "string escapes backslashes, quotes and interpolation sigils" do
+	assert_formats %q{%q(back\slash #{a} #@b #$c "q")}, %q{"back\\\\slash \#{a} \#@b \#$c \"q\""}
+	assert_formats %q{"a\\\\b"}, %q{"a\\\\b"}
+	assert_formats %q{'#'}, %q{"#"}
+	assert_formats %q{'#a'}, %q{"#a"}
+end
+
+test "string escapes control characters" do
+	assert_formats %q{"a\tb\nc\r\e\0"}, %q{"a\tb\nc\r\e\x00"}
+	assert_formats %q{"\0" "1"}, %q{"\x001"}
+	assert_formats %q{"\x7F"}, %q{"\x7F"}
+end
+
+test "string keeps printable non-ASCII text" do
+	assert_formats "\"h\u00E9llo \u65E5\u672C\"", "\"h\u00E9llo \u65E5\u672C\""
+	assert_formats %q{"\u00e9"}, "\"\u00E9\""
+	assert_formats %q{"\u0085"}, %q{"\u{85}"}
+end
+
+test "string with invalid encoding is escaped bytewise" do
+	assert_formats %q{"\xff\xfe"}, %q{"\xFF\xFE"}
+end
+
+test "string prefers single quotes when that avoids escaping" do
+	assert_formats %q{'say "hi"'}, %q{'say "hi"'}
+	assert_formats %q{'say "hi" #{x}'}, %q{'say "hi" #{x}'}
+	assert_formats %q{"it's \"hi\""}, %q{"it's \"hi\""}
+end
+
+test "interpolated string escapes its static parts" do
+	assert_formats %q{"a\\\\#{b}\"#{c}"}, %q{"a\\\\#{b}\"#{c}"}
+	assert_formats %q{"\#{a}#{b}"}, %q{"\#{a}#{b}"}
+	assert_formats %q{"a#" "{b}"}, %q{"a\#{b}"}
+end
+
+test "adjacent string literals merge" do
+	assert_formats %q{"a#{b}" "c" 'd'}, %q{"a#{b}cd"}
+end
+
+test "heredocs become escaped strings" do
+	assert_formats <<~'INPUT', <<~'RUBY'
+		<<~'EOS'
+			a
+			  #{b}
+			\\c
+		EOS
+	INPUT
+		"a\n  \#{b}\n\\\\c\n"
+	RUBY
+
+	assert_formats <<~'INPUT', %q{"a\n#{b}\n".strip}
+		<<~EOS.strip
+			a
+			#{b}
+		EOS
+	INPUT
+end
+
+test "character literals" do
+	assert_formats %q{?a}, %q{"a"}
+	assert_formats %q{?\n}, %q{"\n"}
+end
+
+test "quoted symbols escape their content" do
+	assert_formats %q{:"a\\\\b\"#{1}"}, %q{:"a\\\\b\"#{1}"}
+	assert_formats %q{:"a\tb"}, %q{:"a\tb"}
+	assert_formats %q{%s(a b)}, %q{:"a b"}
+	assert_formats %q{:'#{a}'}, %q{:"\#{a}"}
+end
+
+test "symbols that are not valid bare symbols are quoted" do
+	assert_formats %q{%i[a\ b c]}, "[\n\t:\"a b\",\n\t:c\n]"
+	assert_formats %q{%i[#{a}]}, "[\n\t:\"\\\#{a}\"\n]"
+end
+
+test "operator and sigil symbols stay bare" do
+	%w[:[]= :[] :! :!= :+@ :-@ :** :<=> :=== :=~ :<< :foo? :foo! :foo= :@a :@@a :$a :$1 :$~ :A].each do |symbol|
+		assert_formats symbol, symbol
+	end
+end
+
+test "hash keys that are not valid labels are quoted" do
+	assert_formats %q{{:+ => 1, :a= => 2, :@a => 3, :"a b" => 4, a?: 5}}, <<~'RUBY'
+		{
+			"+": 1,
+			"a=": 2,
+			"@a": 3,
+			"a b": 4,
+			a?: 5
+		}
+	RUBY
+end
+
+test "xstrings escape backticks and interpolation" do
+	assert_formats %q{%x(echo `a` \#{b} #{c})}, %q{`echo \`a\` \#{b} #{c}`}
+	assert_formats %q{%x(a\\\\b)}, %q{`a\\\\b`}
+end
+
+test "word arrays" do
+	assert_formats %q{%w[a\ b c\\d #{e}]}, "[\n\t\"a b\",\n\t\"c\\\\d\",\n\t\"\\\#{e}\"\n]"
+	assert_formats %q{%W[a#{b}c d]}, "[\n\t\"a\#{b}c\",\n\t\"d\"\n]"
+end
+
+test "regular expressions escape unescaped slashes and interpolation sigils" do
+	assert_formats %q{/a\/b/}, %q{/a\/b/}
+	assert_formats %q{%r{a/b}}, %q{/a\/b/}
+	assert_formats %q{%r{a\/b}}, %q{/a\/b/}
+	assert_formats %q{/a\\\\/}, %q{/a\\\\/}
+	assert_formats %q{/\#{a}\#@b/}, %q{/\#{a}\#@b/}
+	assert_formats %q{%r{#{a}/b\d}}, %q{/#{a}\/b\d/}
+end
+
+test "regular expressions keep every flag" do
+	assert_formats %q{/a/mixo}, %q{/a/imxo}
+	assert_formats %q{/a/n}, %q{/a/n}
+	assert_formats %q{/a/u}, %q{/a/u}
+	assert_formats %q{/a/s}, %q{/a/s}
+	assert_formats %q{/a/e}, %q{/a/e}
+	assert_formats %q{/#{a}/n}, %q{/#{a}/n}
+end
+
+test "regular expressions in conditions" do
+	assert_formats "if %r{a/b}n\n\tc\nend", "if /a\\/b/n\n\tc\nend"
+	assert_formats "if %r{\#{a}/b}i\n\tc\nend", "if /\#{a}\\/b/i\n\tc\nend"
+end

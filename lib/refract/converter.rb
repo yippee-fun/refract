@@ -679,6 +679,7 @@ module Refract
 				multi_line: node.multi_line?,
 				extended: node.extended?,
 				once: node.once?,
+				encoding: regexp_encoding(node),
 			)
 		end
 
@@ -690,6 +691,7 @@ module Refract
 				multi_line: node.multi_line?,
 				extended: node.extended?,
 				once: node.once?,
+				encoding: regexp_encoding(node),
 			)
 		end
 
@@ -806,6 +808,7 @@ module Refract
 				multi_line: node.multi_line?,
 				extended: node.extended?,
 				once: node.once?,
+				encoding: regexp_encoding(node),
 			)
 		end
 
@@ -1009,6 +1012,7 @@ module Refract
 				multi_line: node.multi_line?,
 				extended: node.extended?,
 				once: node.once?,
+				encoding: regexp_encoding(node),
 			)
 		end
 
@@ -1201,6 +1205,14 @@ module Refract
 				prism_node: node,
 				arguments: visit(node.arguments),
 			)
+		end
+
+		private def regexp_encoding(node)
+			if node.ascii_8bit? then :ascii_8bit
+			elsif node.euc_jp? then :euc_jp
+			elsif node.windows_31j? then :windows_31j
+			elsif node.utf_8? then :utf_8
+			end
 		end
 	end
 end

@@ -12,5 +12,6 @@ if ENV["COVERAGE"] == "true"
 end
 
 require "refract"
+require_relative "../test/support/semantic_tree"
 
 Bundler.require :test
