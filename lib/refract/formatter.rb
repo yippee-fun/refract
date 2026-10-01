@@ -646,7 +646,7 @@ module Refract
 		end
 
 		visit IfNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " if "
 				visit node.predicate
@@ -1209,7 +1209,7 @@ module Refract
 		end
 
 		visit UnlessNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " unless "
 				visit node.predicate
@@ -1236,7 +1236,7 @@ module Refract
 		end
 
 		visit UntilNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " until "
 				visit node.predicate
@@ -1265,7 +1265,7 @@ module Refract
 		end
 
 		visit WhileNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " while "
 				visit node.predicate
@@ -1411,6 +1411,18 @@ module Refract
 			yield(node)
 		end
 
+		# `inline` records how the node was written, and a rewrite invalidates it:
+		# replacing the single statement of `foo if bar` with several would emit
+		# `a\nb if bar`, where only `b` stays guarded — the rest runs
+		# unconditionally, side effects included. A modifier only reads as one
+		# when it guards exactly one statement.
+		#
+		# Every node that carries `inline` needs this: `if`, `unless`, `while`
+		# and `until` all have a modifier form.
+		private def modifier?(node)
+			node.inline && node.statements&.body&.size == 1
+		end
+
 		# A statement on lines of its own, so a magic comment can go before and after it.
 		private def statement?(node)
 			StatementsNode === @stack[-2] && !inline_statements?(@stack[-3])
@@ -1419,7 +1431,7 @@ module Refract
 		private def inline_statements?(parent)
 			case parent
 			when IfNode, UnlessNode, WhileNode, UntilNode
-				parent.inline
+				modifier?(parent)
 			when ParenthesesNode, EmbeddedStatementsNode
 				true
 			else

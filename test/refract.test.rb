@@ -568,6 +568,123 @@ class RefractTest < Quickdraw::Test
 		RUBY
 	end
 
+	# A modifier `if` cannot be parsed with more than one statement, so this one
+	# is built by hand: it is the shape a rewrite produces when it replaces the
+	# single statement of `foo if bar` with several. Emitted as a modifier, only
+	# the last statement would stay guarded and the rest would run unconditionally.
+	test "modifier unless whose statements were replaced by several" do
+		node = Refract::UnlessNode.new(
+			inline: true,
+			predicate: Refract::LocalVariableReadNode.new(name: :bar),
+			statements: Refract::StatementsNode.new(
+				body: [
+					Refract::LocalVariableReadNode.new(name: :a),
+					Refract::LocalVariableReadNode.new(name: :b),
+				],
+			),
+			else_clause: nil,
+		)
+
+		assert_equal Refract::Formatter.new.format_node(node).source, <<~RUBY.strip
+			unless bar
+				a
+				b
+			end
+		RUBY
+	end
+
+	test "modifier while whose statements were replaced by several" do
+		node = Refract::WhileNode.new(
+			inline: true,
+			predicate: Refract::LocalVariableReadNode.new(name: :bar),
+			statements: Refract::StatementsNode.new(
+				body: [
+					Refract::LocalVariableReadNode.new(name: :a),
+					Refract::LocalVariableReadNode.new(name: :b),
+				],
+			),
+		)
+
+		assert_equal Refract::Formatter.new.format_node(node).source, <<~RUBY.strip
+			while bar
+				a
+				b
+			end
+		RUBY
+	end
+
+	test "modifier until whose statements were replaced by several" do
+		node = Refract::UntilNode.new(
+			inline: true,
+			predicate: Refract::LocalVariableReadNode.new(name: :bar),
+			statements: Refract::StatementsNode.new(
+				body: [
+					Refract::LocalVariableReadNode.new(name: :a),
+					Refract::LocalVariableReadNode.new(name: :b),
+				],
+			),
+		)
+
+		assert_equal Refract::Formatter.new.format_node(node).source, <<~RUBY.strip
+			until bar
+				a
+				b
+			end
+		RUBY
+	end
+
+	test "modifier if whose statements were replaced by several" do
+		node = Refract::IfNode.new(
+			inline: true,
+			predicate: Refract::LocalVariableReadNode.new(name: :bar),
+			statements: Refract::StatementsNode.new(
+				body: [
+					Refract::LocalVariableReadNode.new(name: :a),
+					Refract::LocalVariableReadNode.new(name: :b),
+				],
+			),
+			subsequent: nil,
+		)
+
+		assert_equal Refract::Formatter.new.format_node(node).source, <<~RUBY.strip
+			if bar
+				a
+				b
+			end
+		RUBY
+	end
+
+	# Once emitted as a block, the statements are on lines of their own, so a
+	# shareable constant among them needs its magic comment like any other.
+	test "modifier whose statements were replaced by several keeps a shareable constant directive" do
+		node = Refract::IfNode.new(
+			inline: true,
+			predicate: Refract::LocalVariableReadNode.new(name: :bar),
+			statements: Refract::StatementsNode.new(
+				body: [
+					Refract::LocalVariableReadNode.new(name: :a),
+					Refract::ShareableConstantNode.new(
+						value: :literal,
+						write: Refract::ConstantWriteNode.new(
+							name: :B,
+							value: Refract::IntegerNode.new(value: 1),
+						),
+					),
+				],
+			),
+			subsequent: nil,
+		)
+
+		assert_equal Refract::Formatter.new.format_node(node).source, <<~RUBY.strip
+			if bar
+				a
+				# shareable_constant_value: literal
+				B = 1
+				# shareable_constant_value: none
+			end
+		RUBY
+	end
+
 	test "string escaping" do
 		# Non-interpolating heredocs: the source below is what Prism sees, verbatim.
 		assert_refract <<~'RUBY'
