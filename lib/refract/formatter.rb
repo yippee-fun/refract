@@ -583,7 +583,11 @@ module Refract
 
 		visit ForwardingSuperNode do |node|
 			push "super"
-			visit node.block if node.block
+
+			if node.block
+				space
+				visit node.block
+			end
 		end
 
 		visit GlobalVariableAndWriteNode do |node|

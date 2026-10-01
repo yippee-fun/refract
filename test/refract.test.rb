@@ -1246,6 +1246,14 @@ class RefractTest < Quickdraw::Test
 		RUBY
 	end
 
+	test "forwarding super with a block" do
+		assert_refract <<~RUBY
+			super {
+				foo
+			}
+		RUBY
+	end
+
 	def assert_refract(input)
 		tree = Prism.parse(input).value
 		node = Refract::Converter.new.visit(tree)
