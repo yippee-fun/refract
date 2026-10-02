@@ -13,7 +13,7 @@ module Refract
 				#{IDENTIFIER}[?!=]?
 				| @@?#{IDENTIFIER}
 				| \$(?:#{IDENTIFIER}|-\w|\d+|[~*$?!@/\\;,.=:<>"&`'+])
-				| \[\]=? | [+\-]@? | [~!] | \*\*? | [/%&|^`] | <=> | ===? | =~ | !~ | != | <[<=]? | >[>=]?
+				| \[\]=? | [+-]@? | [~!] | \*\*? | [/%&|^`] | <=> | ===? | =~ | !~ | != | <[<=]? | >[>=]?
 			)\z
 		}x
 
@@ -1532,15 +1532,19 @@ module Refract
 		end
 
 		private def escape_string(string, delimiter)
-			string = string.b unless string.encoding == Encoding::UTF_8 && string.valid_encoding?
+			binary = !(string.encoding == Encoding::UTF_8 && string.valid_encoding?)
+			string = string.b if binary
 
+			# A high byte of a binary string is always escaped. `[[:print:]]` cannot
+			# decide it: CRuby says it is not printable, TruffleRuby says it is, and
+			# emitting it raw yields a source that does not parse.
 			pattern = ESCAPE_PATTERNS.fetch(delimiter)
-			pattern = Regexp.union(pattern, NON_ASCII) if @escape_non_ascii
+			pattern = Regexp.union(pattern, NON_ASCII) if @escape_non_ascii || binary
 
 			string.gsub(pattern) do |char|
 				if (escape = STRING_ESCAPES[char])
 					escape
-				elsif char.bytesize == 1 && char.match?(/[[:print:]]/)
+				elsif char.bytesize == 1 && char.ascii_only? && char.match?(/[[:print:]]/)
 					"\\#{char}"
 				elsif char.bytesize == 1
 					format("\\x%02X", char.ord)
