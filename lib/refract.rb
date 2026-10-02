@@ -22,7 +22,14 @@ module Refract
 		def self.attributes
 			return @attributes if defined?(@attributes)
 
-			@attributes = instance_method(:initialize).parameters.filter_map do |parameter|
+			# CRuby lists required keywords before optional ones, TruffleRuby keeps
+			# declaration order. The order reaches `inspect` and the traversal of
+			# children, so it is fixed here to CRuby's: required first, each group
+			# in declaration order.
+			parameters = instance_method(:initialize).parameters
+			parameters = parameters.each_with_index.sort_by { |(kind, _), index| [(kind == :keyreq) ? 0 : 1, index] }.map(&:first)
+
+			@attributes = parameters.filter_map do |parameter|
 				case parameter
 				in [:key | :keyreq, :prism_node] then nil
 				in [:key | :keyreq, name] then name
