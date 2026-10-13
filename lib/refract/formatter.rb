@@ -13,7 +13,7 @@ module Refract
 				#{IDENTIFIER}[?!=]?
 				| @@?#{IDENTIFIER}
 				| \$(?:#{IDENTIFIER}|-\w|\d+|[~*$?!@/\\;,.=:<>"&`'+])
-				| \[\]=? | [+\-]@? | [~!] | \*\*? | [/%&|^`] | <=> | ===? | =~ | !~ | != | <[<=]? | >[>=]?
+				| \[\]=? | [+-]@? | [~!] | \*\*? | [/%&|^`] | <=> | ===? | =~ | !~ | != | <[<=]? | >[>=]?
 			)\z
 		}x
 
@@ -583,7 +583,11 @@ module Refract
 
 		visit ForwardingSuperNode do |node|
 			push "super"
-			visit node.block if node.block
+
+			if node.block
+				space
+				visit node.block
+			end
 		end
 
 		visit GlobalVariableAndWriteNode do |node|
@@ -646,7 +650,7 @@ module Refract
 		end
 
 		visit IfNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " if "
 				visit node.predicate
@@ -1209,7 +1213,7 @@ module Refract
 		end
 
 		visit UnlessNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " unless "
 				visit node.predicate
@@ -1236,7 +1240,7 @@ module Refract
 		end
 
 		visit UntilNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " until "
 				visit node.predicate
@@ -1265,7 +1269,7 @@ module Refract
 		end
 
 		visit WhileNode do |node|
-			if node.inline
+			if modifier?(node)
 				visit node.statements
 				push " while "
 				visit node.predicate
@@ -1411,6 +1415,18 @@ module Refract
 			yield(node)
 		end
 
+		# `inline` records how the node was written, and a rewrite invalidates it:
+		# replacing the single statement of `foo if bar` with several would emit
+		# `a\nb if bar`, where only `b` stays guarded — the rest runs
+		# unconditionally, side effects included. A modifier only reads as one
+		# when it guards exactly one statement.
+		#
+		# Every node that carries `inline` needs this: `if`, `unless`, `while`
+		# and `until` all have a modifier form.
+		private def modifier?(node)
+			node.inline && node.statements&.body&.size == 1
+		end
+
 		# A statement on lines of its own, so a magic comment can go before and after it.
 		private def statement?(node)
 			StatementsNode === @stack[-2] && !inline_statements?(@stack[-3])
@@ -1419,7 +1435,7 @@ module Refract
 		private def inline_statements?(parent)
 			case parent
 			when IfNode, UnlessNode, WhileNode, UntilNode
-				parent.inline
+				modifier?(parent)
 			when ParenthesesNode, EmbeddedStatementsNode
 				true
 			else
@@ -1516,15 +1532,19 @@ module Refract
 		end
 
 		private def escape_string(string, delimiter)
-			string = string.b unless string.encoding == Encoding::UTF_8 && string.valid_encoding?
+			binary = !(string.encoding == Encoding::UTF_8 && string.valid_encoding?)
+			string = string.b if binary
 
+			# A high byte of a binary string is always escaped. `[[:print:]]` cannot
+			# decide it: CRuby says it is not printable, TruffleRuby says it is, and
+			# emitting it raw yields a source that does not parse.
 			pattern = ESCAPE_PATTERNS.fetch(delimiter)
-			pattern = Regexp.union(pattern, NON_ASCII) if @escape_non_ascii
+			pattern = Regexp.union(pattern, NON_ASCII) if @escape_non_ascii || binary
 
 			string.gsub(pattern) do |char|
 				if (escape = STRING_ESCAPES[char])
 					escape
-				elsif char.bytesize == 1 && char.match?(/[[:print:]]/)
+				elsif char.bytesize == 1 && char.ascii_only? && char.match?(/[[:print:]]/)
 					"\\#{char}"
 				elsif char.bytesize == 1
 					format("\\x%02X", char.ord)

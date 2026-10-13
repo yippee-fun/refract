@@ -1,7 +1,10 @@
 name: CI
 on:
   push:
-    branches: ["main"]
+    # Every branch, so a branch pushed to a fork gets its own run instead of
+    # waiting on a maintainer to approve the workflow of a fork pull request.
+    # "**" rather than "*" because the latter does not match a slash.
+    branches: ["**"]
   pull_request:
     branches: ["main"]
 jobs:
@@ -14,11 +17,14 @@ jobs:
           - "3.2"
           - "3.3"
           - "3.4"
+          - "4.0"
           - "head"
+          - "truffleruby"
+          - "truffleruby-head"
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup
         uses: ruby/setup-ruby@v1
@@ -28,15 +34,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          bundle install --jobs 4 --without development
+          # `--without` was removed from Bundler; it relied on being remembered
+          # across invocations, which Bundler no longer does. The flag makes the
+          # Ruby head job fail before a single gem is installed.
+          bundle config set --local without development
+          bundle install --jobs 4
 
       - name: Quickdraw Tests
-        run: bundle exec qt -t 1
+        run: bundle exec qt
 
   rubocop:
     runs-on: "ubuntu-latest"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup
         uses: ruby/setup-ruby@v1
