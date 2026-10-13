@@ -1568,3 +1568,17 @@ test "nested shareable constant value directives restore the enclosing value" do
 		# shareable_constant_value: none
 	RUBY
 end
+
+test "a syntax error converts to a missing node" do
+	# MissingNode in prism <= 1.9, ErrorRecoveryNode after it (ruby-head).
+	node = Refract::Converter.new.visit(Prism.parse("x = ").value).statements.body.first
+
+	assert((node in Refract::LocalVariableWriteNode[name: :x, value: Refract::MissingNode]))
+end
+
+test "the converter handles whichever syntax error node prism defines" do
+	converter = Refract::Converter.new
+
+	assert_equal converter.respond_to?(:visit_missing_node), Prism.const_defined?(:MissingNode)
+	assert_equal converter.respond_to?(:visit_error_recovery_node), Prism.const_defined?(:ErrorRecoveryNode)
+end

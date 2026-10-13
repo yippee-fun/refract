@@ -422,6 +422,20 @@ module Refract
 			)
 		end
 
+		# Prism represents a syntax error as MissingNode up to prism 1.9 and as
+		# ErrorRecoveryNode after it (ruby/ruby@708656c7, the prism ruby-head
+		# bundles). ErrorRecoveryNode adds an optional `unexpected` child, the stray
+		# node found in place of the missing one; like Prism's own translators we
+		# keep the node a leaf, since source with a syntax error can't be emitted
+		# either way. The original stays reachable through `prism_node`.
+		if Prism.const_defined?(:ErrorRecoveryNode)
+			visit Prism::ErrorRecoveryNode do |node|
+				MissingNode.new(
+					prism_node: node,
+				)
+			end
+		end
+
 		visit Prism::FalseNode do |node|
 			FalseNode.new(
 				prism_node: node,
@@ -842,10 +856,13 @@ module Refract
 			)
 		end
 
-		visit Prism::MissingNode do |node|
-			MissingNode.new(
-				prism_node: node,
-			)
+		# Prism <= 1.9 has MissingNode; later prism replaces it with ErrorRecoveryNode (above).
+		if Prism.const_defined?(:MissingNode)
+			visit Prism::MissingNode do |node|
+				MissingNode.new(
+					prism_node: node,
+				)
+			end
 		end
 
 		visit Prism::ModuleNode do |node|
