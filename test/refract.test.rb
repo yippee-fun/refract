@@ -1134,6 +1134,8 @@ class RefractTest < Quickdraw::Test
 		node = Refract::Converter.new.visit(tree)
 		result = Refract::Formatter.new.format_node(node).source
 
+		# Strict identity: the formatter is expected to reproduce its input
+		# byte for byte, which subsumes any equivalence check.
 		assert_equal result, input.strip
 	end
 
