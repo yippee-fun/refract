@@ -1582,4 +1582,55 @@ class RefractTest < Quickdraw::Test
 		assert_equal converter.respond_to?(:visit_missing_node), Prism.const_defined?(:MissingNode)
 		assert_equal converter.respond_to?(:visit_error_recovery_node), Prism.const_defined?(:ErrorRecoveryNode)
 	end
+
+	test "a block reading and assigning an outer local refers to it at depth 1" do
+		Refract::Converter.new.visit(Prism.parse("x = 1\na, b = 2\n[1].each { x; x = 2; a, c = 3; x ||= 4 }").value) => {
+			statements: { body: [outer, _, { block: { body: { body: [read, write, { lefts: [target_a, target_c] }, or_write] } } }] },
+		}
+
+		assert_equal outer.depth, 0
+		assert_equal read.depth, 1
+		assert_equal write.depth, 1
+		assert_equal target_a.depth, 1
+		assert_equal target_c.depth, 0
+		assert_equal or_write.depth, 1
+	end
+
+	test "a block's own local is at depth 0" do
+		Refract::Converter.new.visit(Prism.parse("[1].each { y = 1; y }").value) => {
+			statements: { body: [{ block: { body: { body: [write, read] } } }] },
+		}
+
+		assert_equal write.depth, 0
+		assert_equal read.depth, 0
+	end
+
+	test "a lambda assigning a name before its enclosing block does has its own local" do
+		Refract::Converter.new.visit(Prism.parse("[1].each { -> { x = 1 }; x = 2 }").value) => {
+			statements: { body: [{ block: { body: { body: [{ body: { body: [lambda_write] } }, block_write] } } }] },
+		}
+
+		assert_equal lambda_write.depth, 0
+		assert_equal block_write.depth, 0
+	end
+
+	test "a modifier if condition assigned after its lambda statement does not capture the lambda's local" do
+		Refract::Converter.new.visit(Prism.parse("set = -> { x = 1 } if (x = 2)").value) => {
+			statements: { body: [{ predicate: { body: { body: [condition_write] } }, statements: { body: [{ value: { body: { body: [lambda_write] } } }] } }] },
+		}
+
+		assert_equal condition_write.depth, 0
+		assert_equal lambda_write.depth, 0
+	end
+
+	test "copy preserves depth" do
+		Refract::Converter.new.visit(Prism.parse("x = 1\n[1].each { x = x }").value) => {
+			statements: { body: [_, { block: { body: { body: [write] } } }] },
+		}
+
+		copy = write.copy(name: :y, value: write.value.copy(name: :y))
+
+		assert_equal copy.depth, 1
+		assert_equal copy.value.depth, 1
+	end
 end

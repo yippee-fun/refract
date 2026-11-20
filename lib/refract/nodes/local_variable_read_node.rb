@@ -2,12 +2,13 @@
 
 module Refract
 	class LocalVariableReadNode < Node
-		def initialize(prism_node: nil, name:)
+		def initialize(prism_node: nil, name:, depth:)
 			@prism_node = prism_node => Prism::Node | nil
 			@name = name
+			@depth = depth
 			freeze
 		end
 
-		attr_accessor :name
+		attr_accessor :name, :depth
 	end
 end
