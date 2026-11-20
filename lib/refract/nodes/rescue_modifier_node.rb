@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :expression, :rescue_expression
+		attr_reader :expression, :rescue_expression
 	end
 end

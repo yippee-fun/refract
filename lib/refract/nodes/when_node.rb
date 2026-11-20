@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :conditions, :statements
+		attr_reader :conditions, :statements
 	end
 end

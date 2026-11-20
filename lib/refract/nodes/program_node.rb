@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :statements, :frozen_string_literal, :encoding
+		attr_reader :statements, :frozen_string_literal, :encoding
 	end
 end

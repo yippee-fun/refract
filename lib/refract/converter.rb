@@ -50,14 +50,14 @@ module Refract
 		visit Prism::ArgumentsNode do |node|
 			ArgumentsNode.new(
 				prism_node: node,
-				arguments: node.arguments&.map { |n| visit(n) },
+				arguments: node.arguments.map { |n| visit(n) },
 			)
 		end
 
 		visit Prism::ArrayNode do |node|
 			ArrayNode.new(
 				prism_node: node,
-				elements: node.elements&.map { |n| visit(n) },
+				elements: node.elements.map { |n| visit(n) },
 			)
 		end
 
@@ -65,9 +65,9 @@ module Refract
 			ArrayPatternNode.new(
 				prism_node: node,
 				constant: visit(node.constant),
-				requireds: node.requireds&.map { |n| visit(n) },
+				requireds: node.requireds.map { |n| visit(n) },
 				rest: visit(node.rest),
-				posts: node.posts&.map { |n| visit(n) },
+				posts: node.posts.map { |n| visit(n) },
 			)
 		end
 
@@ -136,7 +136,7 @@ module Refract
 			BlockParametersNode.new(
 				prism_node: node,
 				parameters: visit(node.parameters),
-				locals: node.locals&.map { |n| visit(n) },
+				locals: node.locals.map { |n| visit(n) },
 			)
 		end
 
@@ -196,6 +196,7 @@ module Refract
 				prism_node: node,
 				receiver: visit(node.receiver),
 				name: node.name,
+				safe_navigation: node.safe_navigation?,
 			)
 		end
 
@@ -211,7 +212,7 @@ module Refract
 			CaseMatchNode.new(
 				prism_node: node,
 				predicate: visit(node.predicate),
-				conditions: node.conditions&.map { |n| visit(n) },
+				conditions: node.conditions.map { |n| visit(n) },
 				else_clause: visit(node.else_clause),
 			)
 		end
@@ -220,7 +221,7 @@ module Refract
 			CaseNode.new(
 				prism_node: node,
 				predicate: visit(node.predicate),
-				conditions: node.conditions&.map { |n| visit(n) },
+				conditions: node.conditions.map { |n| visit(n) },
 				else_clause: visit(node.else_clause),
 			)
 		end
@@ -546,7 +547,7 @@ module Refract
 		visit Prism::HashNode do |node|
 			HashNode.new(
 				prism_node: node,
-				elements: node.elements&.map { |n| visit(n) },
+				elements: node.elements.map { |n| visit(n) },
 			)
 		end
 
@@ -554,7 +555,7 @@ module Refract
 			HashPatternNode.new(
 				prism_node: node,
 				constant: visit(node.constant),
-				elements: node.elements&.map { |n| visit(n) },
+				elements: node.elements.map { |n| visit(n) },
 				rest: visit(node.rest),
 			)
 		end
@@ -694,7 +695,7 @@ module Refract
 		visit Prism::InterpolatedMatchLastLineNode do |node|
 			InterpolatedMatchLastLineNode.new(
 				prism_node: node,
-				parts: node.parts&.map { |n| visit(n) },
+				parts: node.parts.map { |n| visit(n) },
 				ignore_case: node.ignore_case?,
 				multi_line: node.multi_line?,
 				extended: node.extended?,
@@ -718,7 +719,7 @@ module Refract
 		visit Prism::InterpolatedStringNode do |node|
 			InterpolatedStringNode.new(
 				prism_node: node,
-				parts: node.parts&.map { |n| visit(n) },
+				parts: node.parts.map { |n| visit(n) },
 			)
 		end
 
@@ -751,7 +752,7 @@ module Refract
 		visit Prism::KeywordHashNode do |node|
 			KeywordHashNode.new(
 				prism_node: node,
-				elements: node.elements&.map { |n| visit(n) },
+				elements: node.elements.map { |n| visit(n) },
 			)
 		end
 
@@ -885,9 +886,9 @@ module Refract
 		visit Prism::MultiWriteNode do |node|
 			MultiWriteNode.new(
 				prism_node: node,
-				lefts: node.lefts&.map { |n| visit(n) },
+				lefts: node.lefts.map { |n| visit(n) },
 				rest: visit(node.rest),
-				rights: node.rights&.map { |n| visit(n) },
+				rights: node.rights.map { |n| visit(n) },
 				value: visit(node.value),
 			)
 		end
@@ -952,11 +953,11 @@ module Refract
 		visit Prism::ParametersNode do |node|
 			ParametersNode.new(
 				prism_node: node,
-				requireds: node.requireds&.map { |n| visit(n) },
-				optionals: node.optionals&.map { |n| visit(n) },
+				requireds: node.requireds.map { |n| visit(n) },
+				optionals: node.optionals.map { |n| visit(n) },
 				rest: visit(node.rest),
-				posts: node.posts&.map { |n| visit(n) },
-				keywords: node.keywords&.map { |n| visit(n) },
+				posts: node.posts.map { |n| visit(n) },
+				keywords: node.keywords.map { |n| visit(n) },
 				keyword_rest: visit(node.keyword_rest),
 				block: visit(node.block),
 			)
@@ -1066,7 +1067,7 @@ module Refract
 		visit Prism::RescueNode do |node|
 			RescueNode.new(
 				prism_node: node,
-				exceptions: node.exceptions&.map { |n| visit(n) },
+				exceptions: node.exceptions.map { |n| visit(n) },
 				reference: visit(node.reference),
 				statements: visit(node.statements),
 				subsequent: visit(node.subsequent),
@@ -1143,7 +1144,7 @@ module Refract
 		visit Prism::StatementsNode do |node|
 			StatementsNode.new(
 				prism_node: node,
-				body: node.body&.map { |n| visit(n) },
+				body: node.body.map { |n| visit(n) },
 			)
 		end
 
@@ -1166,7 +1167,7 @@ module Refract
 			SymbolNode.new(
 				prism_node: node,
 				unescaped: unescaped(node),
-				quoted: node.opening_loc && node.closing_loc,
+				quoted: !node.opening_loc.nil? && !node.closing_loc.nil?,
 			)
 		end
 
@@ -1205,7 +1206,7 @@ module Refract
 		visit Prism::WhenNode do |node|
 			WhenNode.new(
 				prism_node: node,
-				conditions: node.conditions&.map { |n| visit(n) },
+				conditions: node.conditions.map { |n| visit(n) },
 				statements: visit(node.statements),
 			)
 		end
@@ -1242,26 +1243,28 @@ module Refract
 
 			while (current = queue.shift)
 				case current
-				when Prism::StringNode, Prism::SourceFileNode
+				in Prism::StringNode | Prism::SourceFileNode
 					return true if current.frozen?
 					return false if current.mutable?
-				when Prism::InterpolatedStringNode
+				in Prism::InterpolatedStringNode
 					return true if current.frozen?
+				else
+					nil
 				end
 
 				case current
-				when Prism::InterpolatedStringNode, Prism::InterpolatedSymbolNode, Prism::InterpolatedXStringNode,
-						Prism::InterpolatedRegularExpressionNode, Prism::InterpolatedMatchLastLineNode
+				in Prism::InterpolatedStringNode | Prism::InterpolatedSymbolNode | Prism::InterpolatedXStringNode |
+						Prism::InterpolatedRegularExpressionNode | Prism::InterpolatedMatchLastLineNode
 
 					queue.concat(current.parts.grep_v(Prism::StringNode))
-				when Prism::AssocNode
+				in Prism::AssocNode
 					queue << current.key unless Prism::StringNode === current.key
-					queue << current.value if current.value
-				when Prism::WhenNode
+					queue << current.value
+				in Prism::WhenNode
 					queue.concat(current.conditions.grep_v(Prism::StringNode))
 					queue << current.statements if current.statements
-				when Prism::EmbeddedStatementsNode
-					queue << current.statements unless current.statements&.body in [Prism::StringNode] | nil
+				in Prism::EmbeddedStatementsNode
+					queue << current.statements unless (current.statements&.body in [Prism::StringNode] | nil)
 				else
 					queue.concat(current.compact_child_nodes)
 				end

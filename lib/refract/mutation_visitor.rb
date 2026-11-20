@@ -2,8 +2,15 @@
 
 module Refract
 	class MutationVisitor < BasicVisitor
-		def self.visit(node_class, &)
-			define_method("visit_#{node_class.type}", &)
+		def visit(node)
+			return unless node
+
+			case super
+			in Node => result
+				result
+			in result
+				raise TypeError, "Visiting a #{node.class} returned #{result.inspect}, expected a Refract::Node."
+			end
 		end
 
 		visit AliasGlobalVariableNode do |node|
@@ -519,7 +526,7 @@ module Refract
 
 		visit InterpolatedMatchLastLineNode do |node|
 			node.copy(
-				parts: node.parts.map { |n| visit(n) },
+				parts: node.parts&.map { |n| visit(n) },
 			)
 		end
 

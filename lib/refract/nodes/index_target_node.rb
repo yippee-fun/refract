@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :receiver, :arguments, :block
+		attr_reader :receiver, :arguments, :block
 	end
 end

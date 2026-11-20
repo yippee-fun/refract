@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :parameters, :locals
+		attr_reader :parameters, :locals
 	end
 end

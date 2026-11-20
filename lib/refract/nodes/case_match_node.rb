@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :predicate, :conditions, :else_clause
+		attr_reader :predicate, :conditions, :else_clause
 	end
 end

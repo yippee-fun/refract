@@ -11,6 +11,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :name, :receiver, :parameters, :body
+		attr_reader :name, :receiver, :parameters, :body
 	end
 end

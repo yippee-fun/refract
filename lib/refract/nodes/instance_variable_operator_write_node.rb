@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :name, :value, :binary_operator
+		attr_reader :name, :value, :binary_operator
 	end
 end

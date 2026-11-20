@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :new_name, :old_name
+		attr_reader :new_name, :old_name
 	end
 end

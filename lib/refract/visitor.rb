@@ -144,11 +144,11 @@ module Refract
 		end
 
 		visit ClassVariableReadNode do |node|
-			push node.name
+			nil
 		end
 
 		visit ClassVariableTargetNode do |node|
-			push node.name
+			nil
 		end
 
 		visit ClassVariableWriteNode do |node|

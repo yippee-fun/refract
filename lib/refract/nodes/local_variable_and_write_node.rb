@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :name, :value, :depth
+		attr_reader :name, :value, :depth
 	end
 end

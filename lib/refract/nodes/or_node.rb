@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :left, :operator, :right
+		attr_reader :left, :operator, :right
 	end
 end

@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :constant, :elements, :rest
+		attr_reader :constant, :elements, :rest
 	end
 end

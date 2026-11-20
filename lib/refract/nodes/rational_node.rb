@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :numerator, :denominator
+		attr_reader :numerator, :denominator
 	end
 end
