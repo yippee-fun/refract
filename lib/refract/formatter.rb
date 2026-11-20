@@ -30,7 +30,7 @@ module Refract
 
 		# In a regexp, `#` only needs escaping where it would start interpolation.
 		# The end of the source counts, since the closing `/` can form `$/`.
-		REGEXP_INTERPOLATION = %r{#(?=\{|@@?(?:[A-Za-z_]|[^\x00-\x7F])|\$(?:[A-Za-z_~*$?!@/\\;,.=:<>"&`'+\d]|-\w|[^\x00-\x7F]|\z))}
+		REGEXP_INTERPOLATION = %r{#(?=\{|@@?(?:[A-Za-z_]|[^\x00-\x7F])|\$(?:[A-Za-z_~*$?!@/\\;,.=:<>"&`'+\d]|-(?:\w|[^\x00-\x7F])|[^\x00-\x7F]|\z))}
 
 		ESCAPE_PATTERNS = {
 			'"' => /[\\"]|#(?=[{@$])|[^[:print:]]/,
@@ -62,17 +62,8 @@ module Refract
 			end
 		end
 
-		def visit_each(nodes)
-			return unless nodes
-
-			nodes = nodes.compact
-			last = nodes.length - 1
-
-			nodes.each_with_index do |node, index|
-				length = @buffer.length
-				visit node
-				yield if block_given? && index < last && @buffer.length > length
-			end
+		def visit_each(nodes, &separator)
+			separate(nodes, separator) { |node| visit node }
 		end
 
 		def format_node(node)
@@ -82,11 +73,12 @@ module Refract
 			@current_line = @starting_line
 			@indent = 0
 			@shareable_constant_value = :none
+			@encoding = Encoding::UTF_8
 
 			visit(node)
 
 			Result.new(
-				source: @buffer.join,
+				source: join(@buffer),
 				source_map: @source_map,
 			)
 		end
@@ -126,13 +118,15 @@ module Refract
 		end
 
 		visit ArrayNode do |node|
-			if pattern? && (prefix = word_list_prefix(node.elements))
-				word_list(prefix, node.elements)
+			elements = Array(node.elements)
+
+			if pattern? && (prefix = word_list_prefix(elements))
+				word_list(prefix, elements)
 			else
 				pinned(pattern?) do
 					brackets do
 						indent do
-							visit_operands(node.elements) { push ","; new_line }
+							visit_operands(elements) { push ","; new_line }
 						end
 						new_line
 					end
@@ -151,7 +145,7 @@ module Refract
 			pattern = HashPatternNode === @stack[-2]
 
 			case node.key
-			in SymbolNode
+			in SymbolNode unless leading_jump_argument?
 				bare = !node.key.quoted && bare?(node.key.unescaped, LABEL)
 				push(bare ? node.key.unescaped : quote(node.key.unescaped))
 				push ":"
@@ -165,7 +159,7 @@ module Refract
 			else
 				operand node.key
 				push " => "
-				value = node.value
+				value = (ImplicitNode === node.value) ? node.value.value : node.value
 			end
 
 			pattern ? visit(value) : operand(value)
@@ -275,19 +269,22 @@ module Refract
 
 			arguments = node.arguments&.arguments
 
-			if node.attribute_write && node.block.nil? && arguments
-				if node.name == :[]= && !node.safe_navigation
-					*index, value = arguments
-					receiver node.receiver
-					brackets { visit_operands(index) { push ", " } }
-					push " = "
-					return operand value
-				elsif node.name.match?(SETTER) && arguments.length == 1
+			if node.name.match?(SETTER) && (node.receiver || arguments)
+				case [node.receiver, arguments, node.block]
+				in [Node, [Node => value], nil] unless value in SplatNode | KeywordHashNode | BlockArgumentNode
 					call_receiver(node)
 					push node.name.name.delete_suffix("=")
 					push " = "
-					return operand arguments.first
+					return operand value
+				else
+					raise ArgumentError, "A call to #{node.name} needs a receiver, one positional argument and no block."
 				end
+			elsif node.name == :[]= && node.attribute_write && node.block.nil? && arguments && !node.safe_navigation
+				*index, value = arguments
+				receiver node.receiver
+				brackets { visit_operands(index) { push ", " } }
+				push " = "
+				return operand value
 			end
 
 			call_receiver(node)
@@ -712,7 +709,7 @@ module Refract
 		visit ImaginaryNode do |node|
 			case node.numeric
 			in RationalNode
-				push rational(node.numeric.numerator, node.numeric.denominator, "ri")
+				map_source_and_visit(node.numeric) { push rational(node.numeric.numerator, node.numeric.denominator, "ri") }
 			else
 				visit node.numeric
 				push "i"
@@ -810,32 +807,32 @@ module Refract
 		end
 
 		visit InterpolatedMatchLastLineNode do |node|
-			regexp(node) { visit_parts(node.parts) { |string| push escape_regexp(string, node.extended) } }
+			regexp(node) { visit_parts(node.parts) { |string| escape_regexp(string) } }
 			push ".=~($_)" unless condition
 		end
 
 		visit InterpolatedRegularExpressionNode do |node|
 			unconditional(condition) do
-				regexp(node) { visit_parts(node.parts) { |string| push escape_regexp(string, node.extended) } }
+				regexp(node) { visit_parts(node.parts) { |string| escape_regexp(string) } }
 			end
 		end
 
 		visit InterpolatedStringNode do |node|
 			doubles do
-				visit_parts(node.parts) { |string| push escape_string(string, '"') }
+				visit_parts(node.parts) { |string| escape_string(string, '"') }
 			end
 		end
 
 		visit InterpolatedSymbolNode do |node|
 			push ":"
 			doubles do
-				visit_parts(node.parts) { |string| push escape_string(string, '"') }
+				visit_parts(node.parts) { |string| escape_string(string, '"') }
 			end
 		end
 
 		visit InterpolatedXStringNode do |node|
 			push "`"
-			visit_parts(node.parts) { |string| push escape_string(string, "`") }
+			visit_parts(node.parts) { |string| escape_string(string, "`") }
 			push "`"
 		end
 
@@ -918,7 +915,7 @@ module Refract
 		end
 
 		visit MatchLastLineNode do |node|
-			regexp(node) { push escape_regexp(node.unescaped, node.extended) }
+			regexp(node) { push escape_regexp(node.unescaped) }
 			push ".=~($_)" unless condition
 		end
 
@@ -941,8 +938,8 @@ module Refract
 		visit MatchWriteNode do |node|
 			start = @buffer.length
 			visit node.call.receiver
-			names = node.targets.map(&:name)
-			captures = Prism.parse("#{@buffer[start..].join} =~ nil", scopes: [names]).value.statements.body.first
+			names = Array(node.targets).map(&:name)
+			captures = Prism.parse("#{join(@buffer[start..])} =~ nil", scopes: [names], encoding: @encoding).value.statements.body.first
 			captured = (captures in Prism::MatchWriteNode[targets:]) ? targets.map(&:name) : []
 
 			unless names == captured
@@ -1078,10 +1075,10 @@ module Refract
 		end
 
 		visit ProgramNode do |node|
-			@escape_non_ascii = node.encoding && node.encoding != Encoding::UTF_8
+			@encoding = node.encoding if node.encoding
 
-			if node.encoding && node.encoding != Encoding::UTF_8
-				push "# encoding: #{node.encoding.name}"
+			if escape_non_ascii?
+				push "# encoding: #{@encoding.name}"
 				new_line
 			end
 
@@ -1108,7 +1105,7 @@ module Refract
 
 		visit RegularExpressionNode do |node|
 			unconditional(condition) do
-				regexp(node) { push escape_regexp(node.unescaped, node.extended) }
+				regexp(node) { push escape_regexp(node.unescaped) }
 			end
 		end
 
@@ -1212,7 +1209,7 @@ module Refract
 		end
 
 		visit StatementsNode do |node|
-			visit_each(flatten_statements(node.body)) { new_line }
+			visit_each(each_statement(node.body).to_a) { new_line }
 		end
 
 		visit StringNode do |node|
@@ -1337,11 +1334,20 @@ module Refract
 			in Symbol
 				value.name
 			else
-				nil
+				return
 			end
 
-			@current_line += string.count("\n") if string
+			@current_line += string.count("\n")
 			@buffer << string
+		end
+
+		# Strings in other encodings, or with invalid bytes, are written as bytes.
+		private def join(strings)
+			strings.map(&:b).join.force_encoding(@encoding)
+		end
+
+		private def escape_non_ascii?
+			@encoding != Encoding::UTF_8
 		end
 
 		private def space
@@ -1414,6 +1420,16 @@ module Refract
 				"#{sign}#{digits}#{suffix}"
 			else
 				"#{sign}#{digits[0...-places]}.#{digits[-places..]}#{suffix}"
+			end
+		end
+
+		# `return a: 1` doesn't parse, though `return :a => 1` does.
+		private def leading_jump_argument?
+			case @stack[-4..-2]
+			in [ReturnNode | BreakNode | NextNode, ArgumentsNode => arguments, KeywordHashNode => hash]
+				arguments.arguments.first.equal?(hash)
+			else
+				false
 			end
 		end
 
@@ -1515,7 +1531,7 @@ module Refract
 		end
 
 		private def bare?(name, pattern)
-			name.valid_encoding? && (name.ascii_only? || !@escape_non_ascii) && name.match?(pattern)
+			name.valid_encoding? && (name.ascii_only? || !escape_non_ascii?) && name.match?(pattern)
 		end
 
 		# Anything that binds more loosely than a method argument.
@@ -1576,15 +1592,24 @@ module Refract
 			not?(node) ? parens { visit node } : operand(node)
 		end
 
-		private def visit_operands(nodes, after_keyword: false)
-			nodes.compact.each_with_index do |node, index|
-				yield unless index.zero?
-				operand(node, after_keyword:)
+		private def visit_operands(nodes, after_keyword: false, &separator)
+			separate(nodes, separator) { |node| operand(node, after_keyword:) }
+		end
+
+		# A node that printed nothing gets no separator.
+		private def separate(nodes, separator)
+			nodes = Array(nodes).compact
+			last = nodes.length - 1
+
+			nodes.each_with_index do |node, index|
+				length = @buffer.length
+				yield node
+				separator&.call if index < last && @buffer.length > length
 			end
 		end
 
 		private def modifier(node, keyword)
-			if flatten_statements(node.statements.body).one?
+			if each_statement(node.statements.body).one?
 				visit node.statements
 			else
 				multiline_parens(true) { visit node.statements }
@@ -1644,7 +1669,7 @@ module Refract
 			in BeginNode
 				condition(index - 1) if parent.statements.equal?(node)
 			in StatementsNode
-				condition(index - 1) if flatten_statements(parent.body).one?
+				condition(index - 1) if each_statement(parent.body).one?
 			else
 				nil
 			end
@@ -1667,7 +1692,7 @@ module Refract
 			in ParenthesesNode | RangeNode
 				pattern?(index - 1)
 			in StatementsNode
-				flatten_statements(parent.body).one? && pattern?(index - 1)
+				each_statement(parent.body).one? && pattern?(index - 1)
 			in IfNode | UnlessNode
 				parent.statements.equal?(node) && pattern?(index - 1)
 			else
@@ -1682,7 +1707,7 @@ module Refract
 			in AlternationPatternNode
 				endless?(pattern.right)
 			in StatementsNode
-				(flatten_statements(pattern.body) in [statement]) && endless?(statement)
+				(each_statement(pattern.body).first(2) in [statement]) && endless?(statement)
 			else
 				false
 			end
@@ -1721,11 +1746,13 @@ module Refract
 			elements.each_with_index do |element, index|
 				space unless index.zero?
 
-				case element
-				in StringNode | SymbolNode
-					push escape_string(element.unescaped, "]")
-				else
-					visit_parts(element.parts) { |string| push escape_string(string, "]") }
+				map_source_and_visit(element) do
+					case element
+					in StringNode | SymbolNode
+						push escape_string(element.unescaped, "]")
+					else
+						visit_parts(element.parts) { |string| escape_string(string, "]") }
+					end
 				end
 			end
 
@@ -1733,7 +1760,7 @@ module Refract
 		end
 
 		private def quote(string)
-			if string.include?('"') && string.valid_encoding? && (string.ascii_only? || !@escape_non_ascii) && !string.match?(/['\\]|[^[:print:]]/)
+			if string.include?('"') && string.valid_encoding? && (string.ascii_only? || !escape_non_ascii?) && !string.match?(/['\\]|[^[:print:]]/)
 				"'#{string}'"
 			else
 				%("#{escape_string(string, '"')}")
@@ -1744,7 +1771,7 @@ module Refract
 			string = string.b unless string.encoding == Encoding::UTF_8 && string.valid_encoding?
 
 			pattern = ESCAPE_PATTERNS.fetch(delimiter)
-			pattern = Regexp.union(pattern, NON_ASCII) if @escape_non_ascii
+			pattern = Regexp.union(pattern, NON_ASCII) if escape_non_ascii?
 
 			string.gsub(pattern) { |char| escape_character(char) }
 		end
@@ -1752,22 +1779,24 @@ module Refract
 		private def escape_character(char)
 			if (escape = STRING_ESCAPES[char])
 				escape
-			elsif char.bytesize == 1 && char.match?(/[[:print:]]/)
+			elsif char.bytesize > 1
+				format("\\u{%X}", char.ord)
+			elsif char.match?(/[[:print:]]/)
 				"\\#{char}"
 			else
-				hex_escape(char)
+				format("\\x%02X", char.ord)
 			end
 		end
 
-		# In extended mode an unescaped `#` starts a comment, so the character
-		# after it is escaped instead, which means the same in a comment or a class.
-		private def escape_regexp(string, extended)
+		# Ruby drops a line continuation from a regexp's source, so it can stop a `#`
+		# starting interpolation without changing the pattern, whatever the mode.
+		private def escape_regexp(string)
 			string = string.b unless string.valid_encoding?
 
 			string.gsub(%r{\\.|/|#{REGEXP_INTERPOLATION}}m) do |match|
 				case match
 				in "/" then "\\/"
-				in "#" then extended ? "#\\" : "\\#"
+				in "#" then "#\\\n"
 				else match
 				end
 			end
@@ -1784,58 +1813,47 @@ module Refract
 			push REGEXP_ENCODINGS.fetch(node.encoding) if node.encoding
 		end
 
-		# Text straight after `#@a` or `#$a` would extend the variable's name,
-		# so its first character is written as an escape.
+		# Yields each run of text to be escaped. An embedded variable followed by
+		# escaped text that would extend its name is written in braces.
 		private def visit_parts(parts)
-			previous = nil
-
-			flatten_parts(parts)
+			chunks = flatten_parts(parts)
 				.chunk_while { |a, b| StringNode === a && StringNode === b }
-				.each do |chunk|
-					if StringNode === chunk.first
-						string = chunk.map(&:unescaped).join
-						string = string.b unless string.valid_encoding?
+				.map { |chunk| (StringNode === chunk.first) ? yield(chunk.map(&:unescaped).join) : chunk.first }
 
-						if EmbeddedVariableNode === previous && extensible?(previous.variable) && string.match?(/\A(?:\w|#{NON_ASCII})/)
-							push hex_escape(string[0])
-							string = string[1..]
-						end
-
-						yield string
-					else
-						visit chunk.first
-					end
-
-					previous = chunk.first
+			chunks.each_with_index do |chunk, index|
+				case chunk
+				in String
+					push chunk
+				in EmbeddedVariableNode if extended_by?(chunk.variable, chunks[index + 1])
+					visit EmbeddedStatementsNode.new(prism_node: chunk.prism_node, statements: StatementsNode.new(body: [chunk.variable]))
+				else
+					visit chunk
 				end
+			end
 		end
 
-		# Punctuation variables like `$&` and `$-w` have a fixed length.
-		private def extensible?(variable)
+		# Punctuation variables like `$&` and `$-w` have a fixed length, and `$1` only takes digits.
+		private def extended_by?(variable, text)
 			case variable
 			in NumberedReferenceReadNode
-				true
+				/\A\d/ === text
 			in BackReferenceReadNode
 				false
 			else
-				!variable.name.start_with?("$-") && variable.name.match?(/(?:\w|#{NON_ASCII})\z/)
+				!variable.name.start_with?("$-") && variable.name.match?(/(?:\w|#{NON_ASCII})\z/) && /\A(?:\w|#{NON_ASCII})/ === text
 			end
 		end
 
-		private def hex_escape(char)
-			if char.bytesize == 1
-				format("\\x%02X", char.ord)
-			else
-				format("\\u{%X}", char.ord)
-			end
-		end
+		private def each_statement(body, &)
+			return enum_for(__method__, body) unless block_given?
 
-		private def flatten_statements(body)
-			body.flat_map { |statement| (StatementsNode === statement) ? flatten_statements(statement.body) : statement }
+			Array(body).each do |statement|
+				(StatementsNode === statement) ? each_statement(statement.body, &) : yield(statement)
+			end
 		end
 
 		private def flatten_parts(parts)
-			parts.flat_map { |part| (InterpolatedStringNode === part) ? flatten_parts(part.parts) : part }
+			Array(parts).flat_map { |part| (InterpolatedStringNode === part) ? flatten_parts(part.parts) : part }
 		end
 	end
 end

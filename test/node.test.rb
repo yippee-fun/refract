@@ -81,5 +81,6 @@ class NodeTest < Quickdraw::Test
 
 	test "format node" do
 		assert_equal Refract.format_node(call), "foo(1, 2)"
+		assert_equal Class.new { include Refract }.new.format_node(call), "foo(1, 2)"
 	end
 end

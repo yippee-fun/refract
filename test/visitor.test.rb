@@ -279,8 +279,21 @@ class VisitorTest < Quickdraw::Test
 			end
 
 			error = assert_raises(TypeError) { visitor.new.visit(convert("foo")) }
-			assert_equal error.message, "Visiting a Refract::CallNode returned #{replacement.inspect}, expected a Refract::Node."
+			assert_equal error.message, "Visiting a Refract::CallNode returned #{replacement.inspect}, expected a node."
 		end
+	end
+
+	test "mutation visitor keeps placeholders that accept visitors" do
+		placeholder = Data.define(:text) do
+			def accept(visitor) = self
+		end.new(text: "x")
+
+		visitor = Class.new(Refract::MutationVisitor) do
+			visit(Refract::CallNode) { |node| placeholder }
+		end
+
+		tree = visitor.new.visit(convert("foo; bar"))
+		assert_equal tree.statements.body, [placeholder, placeholder]
 	end
 
 	test "mutation visitor rejects around visit overrides that do not return the visited node" do
@@ -292,6 +305,6 @@ class VisitorTest < Quickdraw::Test
 		end
 
 		error = assert_raises(TypeError) { visitor.new.visit(convert("foo")) }
-		assert_equal error.message, "Visiting a Refract::CallNode returned nil, expected a Refract::Node."
+		assert_equal error.message, "Visiting a Refract::CallNode returned nil, expected a node."
 	end
 end

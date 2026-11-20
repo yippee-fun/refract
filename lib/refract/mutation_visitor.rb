@@ -5,12 +5,10 @@ module Refract
 		def visit(node)
 			return unless node
 
-			case super
-			in Node => result
-				result
-			in result
-				raise TypeError, "Visiting a #{node.class} returned #{result.inspect}, expected a Refract::Node."
-			end
+			result = super
+			return result if result.respond_to?(:accept)
+
+			raise TypeError, "Visiting a #{node.class} returned #{result.inspect}, expected a node."
 		end
 
 		visit AliasGlobalVariableNode do |node|

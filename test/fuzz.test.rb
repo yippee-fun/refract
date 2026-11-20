@@ -11,12 +11,40 @@ class FuzzTest < Quickdraw::Test
 
 		result = SemanticTree.round_trip(source)
 		assert(result.errors.empty?) { "#{source.inspect} formats to:\n\n#{result.source}\n\n#{result.errors.map(&:message).join("\n")}" }
-		assert(result.mismatch.nil?) { "#{source.inspect} formats to:\n\n#{result.source}\n\n#{result.mismatch.inspect}" }
+		next unless result.errors.empty?
+
+		mismatch = mismatch(source, result.source)
+		assert(mismatch.nil?) { "#{source.inspect} formats to:\n\n#{result.source}\n\n#{mismatch.inspect}" }
 	end
 
 	fuzz "formatted generated trees parse back to the same tree", TreeGenerator.program, cases: 50 do |tree|
 		result = TreeShape.round_trip(tree)
 		assert(result.errors.empty?) { TreeShape.report(tree, result) }
 		assert(result.mismatch.nil?) { TreeShape.report(tree, result) }
+	end
+
+	test "the formatter's (nil; x) around a regexp or range is not a mismatch" do
+		refute mismatch("/r/ . !", "!(nil; /r/)")
+		refute mismatch("(a..b).!", "!(nil; a..b)")
+		assert mismatch("!/r/", "!(nil; /r/)")
+		assert mismatch("(1; /r/).!", "!(nil; /r/)")
+	end
+
+	def mismatch(source, formatted)
+		original, regenerated = [source, formatted].map { |it| without_value_wrappers(SemanticTree.of(Prism.parse(it).value)) }
+		SemanticTree.compare(original, regenerated)
+	end
+
+	# Without the formatter's `(nil; x)`, a regexp or range in a condition parses
+	# as a different node, so removing the wrapper can't hide a change of meaning.
+	def without_value_wrappers(tree)
+		case tree
+		in [:parentheses_node, [*, [:body, [:statements_node, [[:body, [[:nil_node, []], [:regular_expression_node | :interpolated_regular_expression_node | :range_node, *] => value]]]]], *]]
+			without_value_wrappers(value)
+		in Array
+			tree.map { |it| without_value_wrappers(it) }
+		else
+			tree
+		end
 	end
 end

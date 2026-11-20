@@ -87,7 +87,9 @@ module Refract
 		end
 	end
 
-	def self.format_node(node)
+	extend self
+
+	def format_node(node)
 		Formatter.new.format_node(node).source
 	end
 end

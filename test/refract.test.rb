@@ -885,6 +885,17 @@ class RefractTest < Quickdraw::Test
 		RUBY
 	end
 
+	test "a keyword hash leading a jump's arguments keeps its rockets" do
+		assert_formats "return :a => 1, b: 2", "return :a => 1, :b => 2"
+		assert_formats "loop { break :\"a b\" => 1 }", "loop {\n\tbreak :\"a b\" => 1\n}"
+		assert_formats "x = 1; [1].each { next :x => x }", "x = 1\n[\n\t1\n].each {\n\tnext :x => x\n}"
+		assert_formats "return 1, a: 1", "return 1, a: 1"
+	end
+
+	test "a concatenated string hash key round trips" do
+		assert_round_trip "x ?c \"s\" => x"
+	end
+
 	test "return" do
 		assert_refract <<~RUBY
 			def foo
@@ -1454,7 +1465,7 @@ class RefractTest < Quickdraw::Test
 	test "hash signs followed by a closing delimiter do not become interpolation" do
 		assert_formats %q{'#$'}, %q{"\#$"}
 		assert_formats %q{'#@'}, %q{"\#@"}
-		assert_formats %q{%r{#$}}, %q{/\#$/}
+		assert_formats %q{%r{#$}}, "/#\\\n$/"
 		assert_formats %q{%x(#$)}, %q{`\#$`}
 	end
 

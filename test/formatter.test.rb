@@ -282,19 +282,34 @@ class FormatterTest < Quickdraw::Test
 		assert_round_trip "begin\nrescue (a ? B : C).d\nend"
 	end
 
-	test "embedded variables are not extended by the text after them" do
-		assert_round_trip "@x = 1; \"\#@x\" \"y\""
-		assert_round_trip "$x = 1; \"\#$x\" \"_\""
-		assert_round_trip "\"\#$1\" \"2\""
-		assert_round_trip "@x = 1; \"\#@x\" \"é\""
+	test "an embedded variable followed by text that would extend its name is braced" do
+		formatted = -> (source) { format(Converter.new.visit(Prism.parse(source).value)) }
+
+		assert_equal formatted.("\"\#@x\" \"y\""), "\"\#{@x}y\""
+		assert_equal formatted.("\"\#$x\" \"_\""), "\"\#{$x}_\""
+		assert_equal formatted.("\"\#@@x\" \"é\""), "\"\#{@@x}é\""
+		assert_equal formatted.("\"\#$1\" \"2\""), "\"\#{$1}2\""
+		assert_equal eval("@x = 1; #{formatted.("\"\#@x\" \"y\"")}"), "1y"
+
+		assert_round_trip "\"\#$1\" \"a\""
 		assert_round_trip "@x = 1; \"\#@x\" \" y\""
-		assert_equal format(Converter.new.visit(Prism.parse("/a\#$&2}/").value)), "/a\#$&2}/"
 		assert_round_trip "\"\#$-w\" \"x\""
+		assert_round_trip "/a\#$&2}/"
+		assert_round_trip "/(?\#$1i:a)/"
+		assert_equal eval(formatted.("/(?\#$1i:a)/")), /(?i:a)/
 
 		ivar = EmbeddedVariableNode.new(variable: InstanceVariableReadNode.new(name: :@x))
-		string = StringNode.new(unescaped: "y")
-		assert_tree(InterpolatedSymbolNode.new(parts: [ivar, string]))
-		assert_equal format(InterpolatedRegularExpressionNode.new(parts: [ivar, string], ignore_case: false, multi_line: false, extended: false, once: false)), "/\#@x\\x79/"
+		i = StringNode.new(unescaped: "i:a)")
+		assert_equal format(InterpolatedSymbolNode.new(parts: [ivar, i])), ":\"\#{@x}i:a)\""
+		assert_equal format(InterpolatedXStringNode.new(parts: [ivar, i])), "`\#{@x}i:a)`"
+		assert_equal format(InterpolatedRegularExpressionNode.new(parts: [StringNode.new(unescaped: "(?"), ivar, i], ignore_case: false, multi_line: false, extended: false, once: false)), "/(?\#{@x}i:a)/"
+		assert_equal format(InterpolatedStringNode.new(parts: [InterpolatedStringNode.new(parts: [ivar]), i])), "\"\#{@x}i:a)\""
+	end
+
+	test "an embedded variable keeps its node shape unless it needs braces" do
+		ivar = EmbeddedVariableNode.new(variable: InstanceVariableReadNode.new(name: :@x))
+		assert_tree(InterpolatedStringNode.new(parts: [ivar, StringNode.new(unescaped: " y")]))
+		assert_tree(InterpolatedStringNode.new(parts: [EmbeddedVariableNode.new(variable: NumberedReferenceReadNode.new(number: 1)), StringNode.new(unescaped: "a")]))
 	end
 
 	test "word arrays in patterns stay values" do
@@ -349,14 +364,31 @@ class FormatterTest < Quickdraw::Test
 		assert_equal format(MatchPredicateNode.new(value:, pattern: value.copy)), "(1r/3) in ^((1r/3))"
 	end
 
-	test "a comment in an extended regexp stays a comment" do
-		source = format(Converter.new.visit(Prism.parse("%r{a#$}x").value))
-		assert_equal source, "/a#\\$/x"
-		assert_equal eval(source).match?("xa"), true
-		assert_equal eval(source).match?("a#"), true
+	test "a hash sign that would start interpolation in a regexp is broken with a line continuation" do
+		assert_equal format(Converter.new.visit(Prism.parse("%r{a#$}x").value)), "/a#\\\n$/x"
 
-		assert_equal format(regexp('[#@a]').copy(extended: true)), "/[#\\@a]/x"
-		assert_equal format(regexp('[#@a]')), '/[\#@a]/'
+		{
+			['a#$', true] => ["xa", "a#"],
+			['(?-x)#$', true] => ["a#"],
+			['(?x)#$', false] => ["xa"],
+			['a(?-x:#$)', true] => ["a#"],
+			['[#$]', true] => ["#", "$"],
+			['[#@a]', false] => ["#", "@"],
+			['(?##$)a', false] => ["a"],
+			["(?#\#{2})a", false] => ["a"],
+			["\#{2}", false] => ["##"],
+			["x # [\n\#$\n", true] => ["x"],
+			["a\#$-é", false] => [],
+		}.each do |(source, extended), matches|
+			node = regexp(source).copy(extended:)
+			expected = Regexp.new(source, extended ? Regexp::EXTENDED : 0)
+			formatted = eval(format(node))
+
+			assert_equal formatted, expected
+			matches.each { |string| assert_equal formatted.match?(string), true }
+		end
+
+		assert_equal eval(format(regexp("\#{2}"))).match?("#"), false
 	end
 
 	test "quoted shorthand keys in hash patterns" do
@@ -434,6 +466,19 @@ class FormatterTest < Quickdraw::Test
 		assert_equal format(hash.copy(elements: nil)), format(hash)
 		assert_equal format(call(:foo, block: block.copy(parameters: block.parameters.copy(locals: nil)))), format(call(:foo, block:))
 		assert_equal format(begin_node.copy(rescue_clause: rescue_clause.copy(exceptions: nil))), format(begin_node)
+
+		array = ArrayNode.new(elements: [])
+		string = InterpolatedStringNode.new(parts: [])
+		when_node = WhenNode.new(conditions: [], statements: nil)
+		match_write = MatchWriteNode.new(call: call(:=~, var(:x), receiver: regexp("a")), targets: [])
+
+		assert_equal format(array.copy(elements: nil)), format(array)
+		assert_equal format(MatchPredicateNode.new(value: var(:x), pattern: array.copy(elements: nil))), "x in %W[]"
+		assert_equal format(call(:foo, ArgumentsNode.new(arguments: nil))), "foo()"
+		assert_equal format(statements(StatementsNode.new(body: nil), int(1))), "1"
+		assert_equal format(string.copy(parts: nil)), format(string)
+		assert_equal format(CaseNode.new(predicate: var(:x), conditions: [when_node.copy(conditions: nil)], else_clause: nil)), format(CaseNode.new(predicate: var(:x), conditions: [when_node], else_clause: nil))
+		assert_equal format(match_write.copy(targets: nil)), format(match_write)
 	end
 
 	test "a safe navigation index write keeps method syntax" do
@@ -450,7 +495,7 @@ class FormatterTest < Quickdraw::Test
 		embedded = EmbeddedStatementsNode.new(statements: statements(int(1)))
 		variable = EmbeddedVariableNode.new(variable: InstanceVariableReadNode.new(name: :@x))
 
-		assert_equal eval(format(regexp(bytes))).source.b, "a\xFFb".b
+		assert_equal format(regexp(bytes)).b, "/a\xFFb/".b
 		assert_equal eval(format(InterpolatedStringNode.new(parts: [StringNode.new(unescaped: bytes), embedded]))).b, "a\xFFb1".b
 		assert_equal format(InterpolatedStringNode.new(parts: [variable, StringNode.new(unescaped: bytes[1..])])), "\"\#@x\\xFFb\""
 		assert_equal format(sym("a\xFF".dup.force_encoding(Encoding::UTF_8))), ":\"a\\xFF\""
@@ -521,5 +566,62 @@ class FormatterTest < Quickdraw::Test
 		assert_equal pattern.(sym("a"), int(1)), "x in ^([\n\t:a,\n\t1\n])"
 		assert_equal pattern.(InterpolatedStringNode.new(parts: [empty])), "x in ^([\n\t\"\"\n])"
 		assert_equal pattern.(InterpolatedStringNode.new(parts: [empty, EmbeddedStatementsNode.new(statements: statements(var(:y)))])), "x in %W[\#{y}]"
+	end
+
+	test "named captures are checked in the program's encoding" do
+		source = "# encoding: iso-8859-1\n/(?<\xE9>x)/ =~ z".b
+		program = Converter.new.visit(Prism.parse(source).value)
+
+		assert_equal format(program).b, "# encoding: ISO-8859-1\n/(?<\xE9>x)/ =~ z".b
+		assert_equal format(program).encoding, Encoding::ISO_8859_1
+		assert_round_trip source
+	end
+
+	test "checking for a condition stays linear in the number of statements" do
+		node = statements(*Array.new(10_000) { range(var(:a), var(:b)) })
+		start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+		format(node)
+
+		assert(Process.clock_gettime(Process::CLOCK_MONOTONIC) - start < 1)
+	end
+
+	test "word list elements and imaginary rationals claim their lines in the source map" do
+		string = StringNode.new(prism_node: Prism.parse("\n\n'a'").value.statements.body.first, unescaped: "a")
+		rational = RationalNode.new(prism_node: Prism.parse("\n\n1r").value.statements.body.first, numerator: 1, denominator: 3)
+
+		result = Formatter.new.format_node(MatchPredicateNode.new(value: var(:x), pattern: ArrayNode.new(elements: [string])))
+		assert_equal result.source, "x in %W[a]"
+		assert_equal result.source_map, [nil, 3]
+
+		result = Formatter.new.format_node(ImaginaryNode.new(numeric: rational))
+		assert_equal result.source, "(1ri/3)"
+		assert_equal result.source_map, [nil, 3]
+	end
+
+	test "a setter call is written as an assignment or raises" do
+		assert_equal format(call(:b=, int(1), receiver: var(:a))), "a.b = 1"
+		assert_equal format(call(:b=, int(1), receiver: SelfNode.new, safe_navigation: true)), "self&.b = 1"
+
+		assert_raises(ArgumentError) { format(call(:b=, int(1), int(2), receiver: var(:a))) }
+		assert_raises(ArgumentError) { format(call(:b=, receiver: var(:a))) }
+		assert_raises(ArgumentError) { format(call(:b=, int(1))) }
+		assert_raises(ArgumentError) { format(call(:b=, SplatNode.new(expression: var(:c)), receiver: var(:a))) }
+		assert_raises(ArgumentError) { format(call(:b=, int(1), receiver: var(:a), block: BlockNode.new(parameters: nil, body: nil))) }
+
+		assert_round_trip "def baz=::x\nend"
+	end
+
+	test "an argument that writes nothing gets no separator" do
+		empty = KeywordHashNode.new(elements: [])
+
+		assert_equal format(call(:foo, empty, int(1))), "foo(1)"
+		assert_equal format(call(:foo, int(1), empty, int(2))), "foo(1, 2)"
+	end
+
+	test "a regexp with invalid bytes and a non-ASCII string format together" do
+		source = format(statements(StringNode.new(unescaped: "é"), regexp("a\xFF".dup.force_encoding(Encoding::UTF_8))))
+
+		assert_equal source.b, "\"é\"\n/a\xFF/".b
+		assert_equal source.encoding, Encoding::UTF_8
 	end
 end
