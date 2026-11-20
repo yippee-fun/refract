@@ -73,7 +73,7 @@ module Refract
 			@current_line = @starting_line
 			@indent = 0
 			@shareable_constant_value = :none
-			@encoding = Encoding::UTF_8
+			@encoding = node&.prism_node&.slice&.encoding || Encoding::UTF_8
 
 			visit(node)
 
@@ -267,10 +267,8 @@ module Refract
 				return operand node.receiver
 			end
 
-			arguments = node.arguments&.arguments
-
-			if node.name.match?(SETTER) && (node.receiver || arguments)
-				case [node.receiver, arguments, node.block]
+			if setter?(node)
+				case [node.receiver, node.arguments&.arguments, node.block]
 				in [Node, [Node => value], nil] unless value in SplatNode | KeywordHashNode | BlockArgumentNode
 					call_receiver(node)
 					push node.name.name.delete_suffix("=")
@@ -279,8 +277,8 @@ module Refract
 				else
 					raise ArgumentError, "A call to #{node.name} needs a receiver, one positional argument and no block."
 				end
-			elsif node.name == :[]= && node.attribute_write && node.block.nil? && arguments && !node.safe_navigation
-				*index, value = arguments
+			elsif index_write?(node)
+				*index, value = node.arguments.arguments
 				receiver node.receiver
 				brackets { visit_operands(index) { push ", " } }
 				push " = "
@@ -581,7 +579,7 @@ module Refract
 			in Float => value if value.nan?
 				push "::Float::NAN"
 			in Float => value if value.infinite?
-				push value.positive? ? "::Float::INFINITY" : "(-::Float::INFINITY)"
+				value.positive? ? push("::Float::INFINITY") : expression { push "-::Float::INFINITY" }
 			in Float => value
 				push value.to_s
 			end
@@ -709,7 +707,13 @@ module Refract
 		visit ImaginaryNode do |node|
 			case node.numeric
 			in RationalNode
-				map_source_and_visit(node.numeric) { push rational(node.numeric.numerator, node.numeric.denominator, "ri") }
+				map_source_and_visit(node.numeric) { rational(node.numeric, "ri") }
+			in FloatNode[value: Float => value] unless value.finite?
+				expression do
+					push "::Complex.rectangular(0, "
+					visit node.numeric
+					push ")"
+				end
 			else
 				visit node.numeric
 				push "i"
@@ -812,7 +816,7 @@ module Refract
 		end
 
 		visit InterpolatedRegularExpressionNode do |node|
-			unconditional(condition) do
+			unconditional(condition(any_parser: true)) do
 				regexp(node) { visit_parts(node.parts) { |string| escape_regexp(string) } }
 			end
 		end
@@ -1091,12 +1095,13 @@ module Refract
 		end
 
 		visit RangeNode do |node|
-			unconditional(condition) { range(node) }
+			unconditional(condition(any_parser: true)) do
+				(pattern? && !literal_ends?(node)) ? expression { range(node) } : range(node)
+			end
 		end
 
 		visit RationalNode do |node|
-			source = rational(node.numerator, node.denominator, "r")
-			pinned(pattern? && source.start_with?("(")) { push source }
+			rational(node, "r")
 		end
 
 		visit RedoNode do |node|
@@ -1104,7 +1109,7 @@ module Refract
 		end
 
 		visit RegularExpressionNode do |node|
-			unconditional(condition) do
+			unconditional(condition(any_parser: true)) do
 				regexp(node) { push escape_regexp(node.unescaped) }
 			end
 		end
@@ -1196,11 +1201,7 @@ module Refract
 		end
 
 		visit SourceLineNode do |node|
-			if node.start_line
-				unconditional(condition == :flip_flop) { push node.start_line.to_s }
-			else
-				push "__LINE__"
-			end
+			unconditional(condition(any_parser: true) == :flip_flop) { push node.start_line&.to_s || "__LINE__" }
 		end
 
 		visit SplatNode do |node|
@@ -1406,21 +1407,51 @@ module Refract
 			push '"'
 		end
 
-		private def rational(numerator, denominator, suffix)
-			rest, twos, fives = denominator, 0, 0
-			(rest /= 2) && (twos += 1) while rest.even?
-			(rest /= 5) && (fives += 1) while (rest % 5).zero?
-			return "(#{numerator}#{suffix}/#{denominator})" unless rest == 1
+		private def rational(node, suffix)
+			numerator, denominator = node.numerator, node.denominator
+			places = decimal_places(denominator)
+			return expression { push "#{numerator}#{suffix}/#{denominator}" } unless places
 
-			places = [twos, fives].max
 			digits = (numerator.abs * (10 ** places) / denominator).to_s.rjust(places + 1, "0")
 			sign = numerator.negative? ? "-" : ""
 
 			if places.zero?
-				"#{sign}#{digits}#{suffix}"
+				push "#{sign}#{digits}#{suffix}"
 			else
-				"#{sign}#{digits[0...-places]}.#{digits[-places..]}#{suffix}"
+				push "#{sign}#{digits[0...-places]}.#{digits[-places..]}#{suffix}"
 			end
+		end
+
+		# A value written as an expression rather than a literal, pinned in a pattern.
+		private def expression(&)
+			push "^" if pattern?
+			parens(&)
+		end
+
+		# A range in a pattern can only have literals at its ends, so is otherwise pinned whole.
+		private def literal_ends?(range)
+			literal?(range.left) && literal?(range.right)
+		end
+
+		private def literal?(node)
+			case node
+			in FloatNode[value: Float => value]
+				value.finite?
+			in RationalNode
+				!decimal_places(node.denominator).nil?
+			in ImaginaryNode
+				literal?(node.numeric)
+			else
+				true
+			end
+		end
+
+		# How many decimal places a fraction with this denominator needs, or nil if it repeats.
+		private def decimal_places(denominator)
+			rest, twos, fives = denominator, 0, 0
+			(rest /= 2) && (twos += 1) while rest.even?
+			(rest /= 5) && (fives += 1) while (rest % 5).zero?
+			[twos, fives].max if rest == 1
 		end
 
 		# `return a: 1` doesn't parse, though `return :a => 1` does.
@@ -1542,7 +1573,7 @@ module Refract
 
 				true
 			in CallNode
-				node.attribute_write
+				setter?(node) || index_write?(node)
 			in nil
 				false
 			else
@@ -1559,6 +1590,14 @@ module Refract
 			else
 				false
 			end
+		end
+
+		private def setter?(node)
+			node.name.match?(SETTER) && (node.receiver || node.arguments)
+		end
+
+		private def index_write?(node)
+			node.name == :[]= && node.attribute_write && node.block.nil? && node.arguments && !node.safe_navigation
 		end
 
 		private def not?(node)
@@ -1638,19 +1677,23 @@ module Refract
 			parens(&)
 		end
 
-		# Ruby reads `(nil; x)` as a value even where a range would be a flip-flop
-		# or a regexp a match against `$_`.
+		# Every Ruby reads `(x if true)` as a value, even where a range would be a
+		# flip-flop or a regexp a match against `$_`.
 		private def unconditional(condition)
 			return yield unless condition
 
-			push "(nil; "
-			yield
-			push ")"
+			parens do
+				yield
+				push " if true"
+			end
 		end
 
 		# Where Ruby reads a range as a flip-flop and a regexp as a match against
-		# `$_`. At the ends of a flip-flop, an integer is compared with `$.`.
-		private def condition(index = @stack.length - 1)
+		# `$_`, with every parser or, given `any_parser`, with at least one. At the
+		# ends of a flip-flop, an integer is compared with `$.`. Unlike Prism,
+		# Ruby 3.3's parser reads the last of several statements as a condition, but
+		# not the body of a `begin` with `rescue` or `ensure`.
+		private def condition(index = @stack.length - 1, any_parser: false)
 			return if index < 1
 
 			node, parent = @stack[index], @stack[index - 1]
@@ -1661,15 +1704,19 @@ module Refract
 			in CallNode
 				:condition if not?(parent)
 			in AndNode | OrNode
-				:condition if condition(index - 1)
+				:condition if condition(index - 1, any_parser:)
 			in FlipFlopNode
 				:flip_flop
 			in ParenthesesNode
-				condition(index - 1)
+				condition(index - 1, any_parser:)
 			in BeginNode
-				condition(index - 1) if parent.statements.equal?(node)
+				if parent.statements.equal?(node) && (any_parser || (parent in BeginNode[rescue_clause: nil, else_clause: nil, ensure_clause: nil]))
+					condition(index - 1, any_parser:)
+				end
 			in StatementsNode
-				condition(index - 1) if each_statement(parent.body).one?
+				if each_statement(parent.body).one? || (any_parser && last_statement(node).equal?(last_statement(parent.body)))
+					condition(index - 1, any_parser:)
+				end
 			else
 				nil
 			end
@@ -1689,8 +1736,10 @@ module Refract
 				parent.value.equal?(node)
 			in AssocNode
 				HashPatternNode === @stack[index - 2] && parent.value.equal?(node)
-			in ParenthesesNode | RangeNode
+			in ParenthesesNode
 				pattern?(index - 1)
+			in RangeNode
+				literal_ends?(parent) && pattern?(index - 1)
 			in StatementsNode
 				each_statement(parent.body).one? && pattern?(index - 1)
 			in IfNode | UnlessNode
@@ -1850,6 +1899,15 @@ module Refract
 			Array(body).each do |statement|
 				(StatementsNode === statement) ? each_statement(statement.body, &) : yield(statement)
 			end
+		end
+
+		private def last_statement(body)
+			Array(body).reverse_each do |statement|
+				last = (StatementsNode === statement) ? last_statement(statement.body) : statement
+				return last if last
+			end
+
+			nil
 		end
 
 		private def flatten_parts(parts)

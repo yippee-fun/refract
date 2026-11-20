@@ -23,11 +23,12 @@ class FuzzTest < Quickdraw::Test
 		assert(result.mismatch.nil?) { TreeShape.report(tree, result) }
 	end
 
-	test "the formatter's (nil; x) around a regexp or range is not a mismatch" do
-		refute mismatch("/r/ . !", "!(nil; /r/)")
-		refute mismatch("(a..b).!", "!(nil; a..b)")
-		assert mismatch("!/r/", "!(nil; /r/)")
-		assert mismatch("(1; /r/).!", "!(nil; /r/)")
+	test "the formatter's (x if true) around a regexp or range is not a mismatch" do
+		refute mismatch("/r/ . !", "!(/r/ if true)")
+		refute mismatch("(a..b).!", "!(a..b if true)")
+		refute mismatch("!(1; /r/)", "!(1; (/r/ if true))")
+		assert mismatch("!/r/", "!(/r/ if true)")
+		assert mismatch("(1; /r/).!", "!(/r/ if true)")
 	end
 
 	def mismatch(source, formatted)
@@ -35,11 +36,11 @@ class FuzzTest < Quickdraw::Test
 		SemanticTree.compare(original, regenerated)
 	end
 
-	# Without the formatter's `(nil; x)`, a regexp or range in a condition parses
+	# Without the formatter's `(x if true)`, a regexp or range in a condition parses
 	# as a different node, so removing the wrapper can't hide a change of meaning.
 	def without_value_wrappers(tree)
 		case tree
-		in [:parentheses_node, [*, [:body, [:statements_node, [[:body, [[:nil_node, []], [:regular_expression_node | :interpolated_regular_expression_node | :range_node, *] => value]]]]], *]]
+		in [:if_node, [[:predicate, [:true_node, []]], [:statements, [:statements_node, [[:body, [[:regular_expression_node | :interpolated_regular_expression_node | :range_node, *] => value]]]]], [:subsequent, nil]]]
 			without_value_wrappers(value)
 		in Array
 			tree.map { |it| without_value_wrappers(it) }

@@ -24,12 +24,14 @@ module Refract
 		end
 
 		def self.attributes
-			@attributes ||= instance_method(:initialize).parameters.filter_map do |parameter|
+			@attributes ||= instance_method(:initialize).parameters.flat_map do |parameter|
 				case parameter
-				in [:key | :keyreq, :prism_node] then nil
-				in [:key | :keyreq, name] then name
+				in [:key | :keyreq, :prism_node] then []
+				in [:key | :keyreq, name] then [name]
+				in [:keyrest, *] then superclass.attributes
+				in [:rest | :block, *] then []
 				end
-			end.freeze
+			end.uniq.freeze
 		end
 
 		def self.inherited(node_class)

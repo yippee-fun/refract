@@ -34,23 +34,24 @@ class FormatterTest < Quickdraw::Test
 		end
 	end
 
-	# Ignores parentheses, single statement wrappers, the `nil; ` that keeps a
+	# Ignores parentheses, single statement wrappers, the `if true` that keeps a
 	# range or regexp out of a condition, and whether an `if` was a modifier.
 	def normalize(node)
 		case node
-		when ParenthesesNode
+		in ParenthesesNode
 			normalize(node.body)
-		when StatementsNode
+		in IfNode[predicate: TrueNode, subsequent: nil] if normalize(node.statements) in ["range_node" | "regular_expression_node" | "interpolated_regular_expression_node", *]
+			normalize(node.statements)
+		in StatementsNode
 			case flatten(node.body)
 			in [statement] then normalize(statement)
-			in [NilNode, statement] then normalize(statement)
 			in statements then [:statements, statements.map { |it| normalize(it) }]
 			end
-		when Node
+		in Node
 			[node.type, (node.class.attributes - [:inline, :depth]).to_h { |name| [name, normalize(node.public_send(name))] }]
-		when Array
+		in Array
 			node.map { |it| normalize(it) }
-		when nil, false
+		in nil | false
 			false
 		else
 			node
@@ -361,7 +362,7 @@ class FormatterTest < Quickdraw::Test
 
 	test "a rational without an exact decimal is pinned in a pattern" do
 		value = RationalNode.new(numerator: 1, denominator: 3)
-		assert_equal format(MatchPredicateNode.new(value:, pattern: value.copy)), "(1r/3) in ^((1r/3))"
+		assert_equal format(MatchPredicateNode.new(value:, pattern: value.copy)), "(1r/3) in ^(1r/3)"
 	end
 
 	test "a hash sign that would start interpolation in a regexp is broken with a line continuation" do
@@ -405,7 +406,8 @@ class FormatterTest < Quickdraw::Test
 	end
 
 	test "__LINE__ at the end of a flip-flop is not compared with $." do
-		assert_equal format(Converter.new.visit(Prism.parse("if __LINE__..false; end").value)), "if ((nil; 1)..false)\nend"
+		assert_equal format(Converter.new.visit(Prism.parse("if __LINE__..false; end").value)), "if ((1 if true)..false)\nend"
+		assert_equal format(if_node(flip_flop(SourceLineNode.new, FalseNode.new), var(:c))), "if ((__LINE__ if true)..false)\n\tc\nend"
 		assert_round_trip "x = __LINE__..false"
 		assert_round_trip "if __LINE__; end"
 	end
@@ -553,9 +555,10 @@ class FormatterTest < Quickdraw::Test
 		assert_equal format(flip_flop(var(:a), var(:b))), "((a..b) ? true : false)"
 	end
 
-	test "a regexp alone in a statements predicate is a condition" do
-		assert_equal format(if_node(statements(regexp("a")), var(:c))), "if (\n\t(nil; /a/)\n)\n\tc\nend"
-		assert_equal format(if_node(statements(var(:x), regexp("a")), var(:c))), "if (\n\tx\n\t/a/\n)\n\tc\nend"
+	test "a regexp ending a statements predicate stays a value" do
+		assert_equal format(if_node(statements(regexp("a")), var(:c))), "if (\n\t(/a/ if true)\n)\n\tc\nend"
+		assert_equal format(if_node(statements(var(:x), regexp("a")), var(:c))), "if (\n\tx\n\t(/a/ if true)\n)\n\tc\nend"
+		assert_equal format(if_node(statements(regexp("a"), var(:x)), var(:c))), "if (\n\t/a/\n\tx\n)\n\tc\nend"
 	end
 
 	test "arrays in patterns are word lists only when every element is a word" do
@@ -623,5 +626,89 @@ class FormatterTest < Quickdraw::Test
 
 		assert_equal source.b, "\"é\"\n/a\xFF/".b
 		assert_equal source.encoding, Encoding::UTF_8
+	end
+
+	# A regexp that became a match against `$_` would be nil, and a range that
+	# became a flip-flop of `a = b = false` would be false.
+	def evaluate(node)
+		eval("$_ = 'z'\n$. = 5\na = b = false\n#{format(node)}")
+	end
+
+	def if_else(predicate) = if_node(predicate, TrueNode.new, subsequent: ElseNode.new(statements: statements(FalseNode.new)))
+	def parenthesized(*body) = ParenthesesNode.new(body: statements(*body))
+	def begin_rescue(*body) = BeginNode.new(statements: statements(*body), rescue_clause: RescueNode.new(exceptions: [], reference: nil, statements: nil, subsequent: nil), else_clause: nil, ensure_clause: nil)
+
+	test "regexps and ranges in conditions evaluate as values on every Ruby" do
+		interpolated = InterpolatedRegularExpressionNode.new(parts: [StringNode.new(unescaped: "a"), EmbeddedStatementsNode.new(statements: statements(int(1)))], ignore_case: false, multi_line: false, extended: false, once: false)
+
+		[regexp("a"), interpolated, range(var(:a), var(:b))].each do |value|
+			assert_equal evaluate(call(:!, receiver: value)), false
+			assert_equal evaluate(call(:!, receiver: parenthesized(NilNode.new, value))), false
+			assert_equal evaluate(if_else(value)), true
+			assert_equal evaluate(if_else(statements(NilNode.new, value))), true
+			assert_equal evaluate(if_else(and_node(parenthesized(NilNode.new, value), TrueNode.new))), true
+			assert_equal evaluate(if_else(begin_rescue(value))), true
+			assert_equal evaluate(if_else(flip_flop(value, FalseNode.new))), true
+		end
+	end
+
+	test "flip-flops and matches against $_ evaluate as conditions on every Ruby" do
+		assert_equal evaluate(if_else(begin_rescue(match_last_line("a")))), false
+		assert_equal evaluate(if_else(begin_rescue(flip_flop(var(:a), var(:b))))), false
+		assert_equal evaluate(if_else(statements(NilNode.new, match_last_line("a")))), false
+		assert_equal evaluate(write(:x, match_last_line("z"))), 0
+		assert_equal evaluate(write(:x, flip_flop(TrueNode.new, var(:b)))), true
+		assert_equal evaluate(Converter.new.visit(Prism.parse("if ((1..b)) then true else false end").value)), false
+		assert_equal evaluate(Converter.new.visit(Prism.parse("if ((a..b)) then true else false end").value)), false
+		assert_equal evaluate(if_else(flip_flop(SourceLineNode.new, FalseNode.new))), true
+		assert_equal evaluate(Converter.new.visit(Prism.parse("if __LINE__..false then true else false end").value)), true
+	end
+
+	test "a fragment is formatted in the encoding of its source" do
+		program = Converter.new.visit(Prism.parse("# encoding: iso-8859-1\n/(?<\xE9>x)/ =~ z".b).value)
+		source = format(program.statements.body.first)
+
+		assert_equal source.b, "/(?<\xE9>x)/ =~ z".b
+		assert_equal source.encoding, Encoding::ISO_8859_1
+		assert Prism::MatchWriteNode === Prism.parse(source, encoding: source.encoding).value.statements.body.first
+	end
+
+	test "a setter call without attribute_write is parenthesized as a receiver" do
+		setter = call(:v=, int(-1), receiver: var(:box))
+
+		assert_equal format(call(:abs, receiver: setter)), "(box.v = -1).abs"
+		assert_equal format(call(:abs, receiver: setter.copy(attribute_write: true))), "(box.v = -1).abs"
+		assert_equal format(call(:abs, receiver: call(:[]=, int(0), int(1), receiver: var(:a)))), "a.[]=(0, 1).abs"
+	end
+
+	test "non-finite imaginary numbers are written as expressions" do
+		{ Float::INFINITY => "(::Complex.rectangular(0, ::Float::INFINITY))", -Float::INFINITY => "(::Complex.rectangular(0, (-::Float::INFINITY)))", Float::NAN => "(::Complex.rectangular(0, ::Float::NAN))" }.each do |value, expected|
+			source = format(ImaginaryNode.new(numeric: FloatNode.new(value:)))
+
+			assert_equal source, expected
+			assert_equal eval(source).real, 0
+			assert_equal eval(source).imaginary.to_s, value.to_s
+		end
+	end
+
+	test "numbers written as expressions are pinned in a pattern" do
+		pattern = -> (value) { format(MatchPredicateNode.new(value: var(:x), pattern: value)) }
+
+		assert_equal pattern.(ImaginaryNode.new(numeric: RationalNode.new(numerator: 1, denominator: 3))), "x in ^(1ri/3)"
+		assert_equal pattern.(ImaginaryNode.new(numeric: FloatNode.new(value: Float::INFINITY))), "x in ^(::Complex.rectangular(0, ::Float::INFINITY))"
+		assert_equal pattern.(FloatNode.new(value: -Float::INFINITY)), "x in ^(-::Float::INFINITY)"
+		assert_equal pattern.(FloatNode.new(value: Float::INFINITY)), "x in ::Float::INFINITY"
+		assert_equal pattern.(range(int(0), FloatNode.new(value: Float::INFINITY))), "x in ^(0..::Float::INFINITY)"
+		assert_equal pattern.(range(FloatNode.new(value: -Float::INFINITY), RationalNode.new(numerator: 1, denominator: 3))), "x in ^((-::Float::INFINITY)..(1r/3))"
+		assert_equal pattern.(range(int(0), RationalNode.new(numerator: 1, denominator: 2))), "x in 0..0.5r"
+
+		{
+			ImaginaryNode.new(numeric: RationalNode.new(numerator: 1, denominator: 3)) => Complex(0, 1/3r),
+			ImaginaryNode.new(numeric: FloatNode.new(value: -Float::INFINITY)) => Complex(0, -Float::INFINITY),
+			FloatNode.new(value: -Float::INFINITY) => -Float::INFINITY,
+			range(FloatNode.new(value: -Float::INFINITY), RationalNode.new(numerator: 1, denominator: 3)) => 0,
+		}.each do |value, x|
+			assert eval(pattern.(value))
+		end
 	end
 end

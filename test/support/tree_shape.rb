@@ -2,7 +2,8 @@
 
 # What a Refract tree means, without the parts that only say how it was
 # written: parentheses and bare begins, single statement wrappers, statements
-# nested in statements, modifier vs block form, quoted symbols, local depths and
+# nested in statements, modifier vs block form, flip-flops in `? true : false`,
+# ranges and regexps in `(x if true)`, quoted symbols, local depths and
 # Converter's locations.
 module TreeShape
 	extend self
@@ -41,6 +42,10 @@ module TreeShape
 			in [statement] then of(statement)
 			in body then Shape.new("statements_node", { body: of(body) })
 			end
+		in Refract::IfNode[statements: Refract::StatementsNode[body: [Refract::TrueNode]], subsequent: Refract::ElseNode[statements: Refract::StatementsNode[body: [Refract::FalseNode]]]] if of(value.predicate) in Shape[type: "flip_flop_node"]
+			of(value.predicate)
+		in Refract::IfNode[predicate: Refract::TrueNode, subsequent: nil] if of(value.statements) in Shape[type: "range_node" | "regular_expression_node" | "interpolated_regular_expression_node"]
+			of(value.statements)
 		in Refract::IfNode | Refract::UnlessNode
 			Shape.new(value.type, attributes(value).except(:inline))
 		in Refract::SymbolNode

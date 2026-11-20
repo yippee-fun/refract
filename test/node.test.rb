@@ -36,6 +36,31 @@ class NodeTest < Quickdraw::Test
 		assert_equal node.copy(name: :bar).class, RenamedCallNode
 	end
 
+	test "a subclass whose constructor forwards keywords keeps its superclass's attributes" do
+		subclass = Class.new(Refract::CallNode) do
+			def initialize(tag: nil, **)
+				@tag = tag
+				super(**)
+			end
+
+			attr_reader :tag
+		end
+
+		node = subclass.new(name: :foo, tag: :a)
+		copy = node.copy(name: :bar)
+
+		assert_equal subclass.attributes, [:tag, *Refract::CallNode.attributes]
+		assert_equal [copy.class, copy.name, copy.tag], [subclass, :bar, :a]
+		assert_equal node.copy(tag: :b).tag, :b
+
+		forwarding = Class.new(Refract::CallNode) do
+			def initialize(...) = super
+		end
+
+		assert_equal forwarding.attributes, Refract::CallNode.attributes
+		assert_equal forwarding.new(name: :foo).copy(name: :bar).name, :bar
+	end
+
 	test "child arrays are frozen, so copies can share them" do
 		original = call
 		copy = original.copy

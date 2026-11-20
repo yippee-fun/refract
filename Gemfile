@@ -10,7 +10,7 @@ group :test do
 end
 
 group :development, :test do
-	gem "rubocop", platform: :ruby
+	gem "rubocop"
 end
 
 group :development do

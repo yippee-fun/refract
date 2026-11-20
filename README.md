@@ -45,7 +45,7 @@ Not preserved:
 bundle exec qd                                  # the suite, including property tests
 CORPUS=1 bundle exec qd test/corpus.test.rb     # round trip the standard library and installed gems
 CORPUS=rubygems bundle exec qd test/corpus.test.rb  # only files whose path matches
-bundle exec qd fuzz test/fuzz.test.rb           # fuzz source round trips and generated trees
+bundle exec qd fuzz test/fuzz.test.rb --timeout 10  # fuzz source round trips and generated trees
 bundle exec qd --coverage                       # coverage report in .quickdraw/coverage/
 bundle exec qd mutate lib                       # mutation testing, after a coverage run
 ```
