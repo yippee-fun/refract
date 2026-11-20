@@ -6,6 +6,7 @@
 /pkg/
 /spec/reports/
 /tmp/
+/.quickdraw/
 /exe/*/
 test/dummy/log/test.log
 .DS_Store

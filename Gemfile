@@ -6,7 +6,7 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 gemspec
 
 group :test do
-	gem "quickdraw", github: "joeldrapper/quickdraw"
+	gem "quickdraw", github: "joeldrapper/quickdraw", ref: "8f2ab5b7d8f0d4a9edb0e9297403326de57d5825"
 	gem "simplecov", require: false, platform: :ruby
 end
 
