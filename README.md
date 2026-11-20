@@ -19,4 +19,4 @@ Not preserved:
 - `__END__` and the data after it, so `DATA` is not defined.
 - The encoding of string literals containing raw non-ASCII bytes in an `# encoding: ASCII-8BIT` file, because Prism reports such files as UTF-8.
 
-Run `CORPUS=1 bundle exec qt test/corpus.test.rb` to round trip every Ruby file in the standard library and installed gems.
+Run `CORPUS=1 bundle exec qd test/corpus.test.rb` to round trip every Ruby file in the standard library and installed gems.

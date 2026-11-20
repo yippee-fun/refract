@@ -2,7 +2,7 @@
 
 class CorpusTest < Quickdraw::Test
 	# Slow: round trips every Ruby file in the standard library and installed
-	# gems. Run with `CORPUS=1 bundle exec qt test/corpus.test.rb`. Set CORPUS to
+	# gems. Run with `CORPUS=1 bundle exec qd test/corpus.test.rb`. Set CORPUS to
 	# a path fragment (e.g. `CORPUS=rubygems`) to only check matching files.
 	if ENV["CORPUS"]
 		require_relative "support/corpus"

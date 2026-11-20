@@ -11,7 +11,6 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest"]
         ruby-version:
-          - "3.2"
           - "3.3"
           - "3.4"
           - "4.0"
@@ -34,7 +33,7 @@ jobs:
           bundle install --jobs 4
 
       - name: Quickdraw Tests
-        run: bundle exec qt
+        run: bundle exec qd
 
   rubocop:
     runs-on: "ubuntu-latest"
