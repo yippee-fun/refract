@@ -137,7 +137,7 @@ class TreeGenerator
 		case choose(position.locals.empty? ? LEAVES - [:local] : LEAVES)
 		in :integer then Refract::IntegerNode.new(value: choose([1, 0, 2, -1, -2]))
 		in :nil then Refract::NilNode.new
-		in :local then Refract::LocalVariableReadNode.new(name: choose(position.locals))
+		in :local then Refract::LocalVariableReadNode.new(name: choose(position.locals), depth: nil)
 		in :function then send_call(nil, choose(FUNCTIONS), variable_call: true)
 		in :float then Refract::FloatNode.new(value: choose(%w[1.5 -0.5]))
 		in :string then Refract::StringNode.new(unescaped: "s")
@@ -167,7 +167,7 @@ class TreeGenerator
 		value = expression(depth, position.operand)
 
 		case choose(position.assignable.empty? ? %i[instance_variable] : %i[local instance_variable])
-		in :local then Refract::LocalVariableWriteNode.new(name: choose(position.assignable), value:)
+		in :local then Refract::LocalVariableWriteNode.new(name: choose(position.assignable), value:, depth: nil)
 		in :instance_variable then Refract::InstanceVariableWriteNode.new(name: choose(INSTANCE_VARIABLES), value:)
 		end
 	end
@@ -273,7 +273,7 @@ class TreeGenerator
 		if position.assignable.empty?
 			Refract::InstanceVariableTargetNode.new(name: choose(INSTANCE_VARIABLES))
 		else
-			Refract::LocalVariableTargetNode.new(name: choose(position.assignable))
+			Refract::LocalVariableTargetNode.new(name: choose(position.assignable), depth: nil)
 		end
 	end
 

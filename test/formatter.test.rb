@@ -47,7 +47,7 @@ class FormatterTest < Quickdraw::Test
 			in statements then [:statements, statements.map { |it| normalize(it) }]
 			end
 		when Node
-			[node.type, (node.class.attributes - [:inline]).to_h { |name| [name, normalize(node.public_send(name))] }]
+			[node.type, (node.class.attributes - [:inline, :depth]).to_h { |name| [name, normalize(node.public_send(name))] }]
 		when Array
 			node.map { |it| normalize(it) }
 		when nil, false
@@ -73,8 +73,8 @@ class FormatterTest < Quickdraw::Test
 	def flip_flop(left, right) = FlipFlopNode.new(left:, right:, exclude_end: false)
 	def if_modifier(body, predicate) = IfNode.new(predicate:, statements: statements(body), inline: true)
 	def if_node(predicate, *body, subsequent: nil) = IfNode.new(predicate:, statements: statements(*body), subsequent:, inline: false)
-	def write(name, value) = LocalVariableWriteNode.new(name:, value:)
-	def target(name) = LocalVariableTargetNode.new(name:)
+	def write(name, value) = LocalVariableWriteNode.new(name:, value:, depth: nil)
+	def target(name) = LocalVariableTargetNode.new(name:, depth: nil)
 	def regexp(source) = RegularExpressionNode.new(unescaped: source, ignore_case: false, multi_line: false, extended: false, once: false)
 	def match_last_line(source) = MatchLastLineNode.new(unescaped: source, ignore_case: false, multi_line: false, extended: false, once: false)
 	def in_block(node) = call(:foo, block: BlockNode.new(parameters: nil, body: statements(node)))
@@ -169,7 +169,7 @@ class FormatterTest < Quickdraw::Test
 
 	test "modifier bodies with several statements are parenthesized" do
 		assert_tree(if_modifier(statements(var(:a), var(:b)), var(:c)))
-		assert_tree(statements(write(:x, int(1)), call(:foo, statements(write(:x, int(2)), LocalVariableReadNode.new(name: :x)))))
+		assert_tree(statements(write(:x, int(1)), call(:foo, statements(write(:x, int(2)), LocalVariableReadNode.new(name: :x, depth: nil)))))
 	end
 
 	test "a modifier if or unless with an else is written in full" do

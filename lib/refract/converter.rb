@@ -803,6 +803,7 @@ module Refract
 			LocalVariableReadNode.new(
 				prism_node: node,
 				name: node.name,
+				depth: node.depth,
 			)
 		end
 
@@ -810,6 +811,7 @@ module Refract
 			LocalVariableTargetNode.new(
 				prism_node: node,
 				name: node.name,
+				depth: node.depth,
 			)
 		end
 
@@ -818,6 +820,7 @@ module Refract
 				prism_node: node,
 				name: node.name,
 				value: visit(node.value),
+				depth: node.depth,
 			)
 		end
 

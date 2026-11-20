@@ -2,7 +2,7 @@
 
 # What a Refract tree means, without the parts that only say how it was
 # written: parentheses and bare begins, single statement wrappers, statements
-# nested in statements, modifier vs block form, quoted symbols, and
+# nested in statements, modifier vs block form, quoted symbols, local depths and
 # Converter's locations.
 module TreeShape
 	extend self
@@ -45,6 +45,8 @@ module TreeShape
 			Shape.new(value.type, attributes(value).except(:inline))
 		in Refract::SymbolNode
 			Shape.new(value.type, attributes(value).except(:quoted))
+		in Refract::LocalVariableReadNode | Refract::LocalVariableWriteNode | Refract::LocalVariableTargetNode
+			Shape.new(value.type, attributes(value).except(:depth))
 		in Refract::WhileNode | Refract::UntilNode
 			do_while = !!value.inline && (value.statements in Refract::StatementsNode[body: [Refract::BeginNode]])
 			Shape.new(value.type, attributes(value).except(:inline).merge(do_while:))
