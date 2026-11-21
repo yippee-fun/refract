@@ -581,11 +581,22 @@ class FormatterTest < Quickdraw::Test
 	end
 
 	test "checking for a condition stays linear in the number of statements" do
-		node = statements(*Array.new(10_000) { range(var(:a), var(:b)) })
-		start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-		format(node)
+		# Best of three after a warm-up, so JIT compilation isn't timed.
+		time = lambda do |count|
+			node = statements(*Array.new(count) { range(var(:a), var(:b)) })
+			Array.new(3) do
+				start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+				format(node)
+				Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+			end.min
+		end
 
-		assert(Process.clock_gettime(Process::CLOCK_MONOTONIC) - start < 1)
+		time.call(1_000)
+		small = time.call(1_000)
+		large = time.call(10_000)
+
+		# Quadratic work would take a hundred times as long.
+		assert(large < small * 40)
 	end
 
 	test "word list elements and imaginary rationals claim their lines in the source map" do
