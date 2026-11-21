@@ -658,7 +658,11 @@ class FormatterTest < Quickdraw::Test
 		assert_equal evaluate(if_else(statements(NilNode.new, match_last_line("a")))), false
 		assert_equal evaluate(write(:x, match_last_line("z"))), 0
 		assert_equal evaluate(write(:x, flip_flop(TrueNode.new, var(:b)))), true
-		assert_equal evaluate(Converter.new.visit(Prism.parse("if ((1..b)) then true else false end").value)), false
+		# TruffleRuby treats an integer literal in a flip-flop as true rather than comparing it with `$.`.
+		unless RUBY_ENGINE == "truffleruby"
+			assert_equal evaluate(Converter.new.visit(Prism.parse("if ((1..b)) then true else false end").value)), false
+		end
+
 		assert_equal evaluate(Converter.new.visit(Prism.parse("if ((a..b)) then true else false end").value)), false
 		assert_equal evaluate(if_else(flip_flop(SourceLineNode.new, FalseNode.new))), true
 		assert_equal evaluate(Converter.new.visit(Prism.parse("if __LINE__..false then true else false end").value)), true

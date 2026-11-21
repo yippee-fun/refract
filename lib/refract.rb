@@ -24,7 +24,9 @@ module Refract
 		end
 
 		def self.attributes
-			@attributes ||= instance_method(:initialize).parameters.flat_map do |parameter|
+			# CRuby lists required keywords first, TruffleRuby in the order they're
+			# declared, so they're sorted for the same order everywhere.
+			@attributes ||= instance_method(:initialize).parameters.sort_by.with_index { |(type, _), index| [(type == :keyreq) ? 0 : 1, index] }.flat_map do |parameter|
 				case parameter
 				in [:key | :keyreq, :prism_node] then []
 				in [:key | :keyreq, name] then [name]
