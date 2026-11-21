@@ -8,6 +8,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :body
+		attr_reader :body
 	end
 end

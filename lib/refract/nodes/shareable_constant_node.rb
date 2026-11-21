@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :write, :value
+		attr_reader :write, :value
 	end
 end

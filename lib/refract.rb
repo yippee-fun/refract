@@ -5,30 +5,65 @@ require "zeitwerk"
 
 module Refract
 	Loader = Zeitwerk::Loader.for_gem.tap do |loader|
-		loader.ignore("#{__dir__}/ruby_lsp")
 		loader.ignore("#{__dir__}/rubocop")
-		loader.collapse("#{__dir__}/refract/errors")
 		loader.collapse("#{__dir__}/refract/nodes")
 		loader.setup
 	end
 
 	class Node
 		def self.type
-			return @type if defined?(@type)
-			demodularized_name = name.split("::").last
-			@type = demodularized_name.gsub(/(?<=[A-Z])(?=[A-Z][a-z])|(?<=[a-z\d])(?=[A-Z])/, "_").downcase
+			@type ||= begin
+				raise ArgumentError, "Anonymous node classes have no type. Assign #{self} to a constant before using it." unless name
+
+				name.split("::").last.gsub(/(?<=[A-Z])(?=[A-Z][a-z])|(?<=[a-z\d])(?=[A-Z])/, "_").downcase.freeze
+			end
+		end
+
+		def self.visit_method
+			@visit_method ||= :"visit_#{type}"
 		end
 
 		def self.attributes
-			return @attributes if defined?(@attributes)
-
-			@attributes = instance_method(:initialize).parameters.filter_map do |parameter|
+			@attributes ||= instance_method(:initialize).parameters.flat_map do |parameter|
 				case parameter
-				in [:key | :keyreq, :prism_node] then nil
-				in [:key | :keyreq, name] then name
+				in [:key | :keyreq, :prism_node] then []
+				in [:key | :keyreq, name] then [name]
+				in [:keyrest, *] then superclass.attributes
+				in [:rest | :block, *] then []
 				end
-			end.freeze
+			end.uniq.freeze
 		end
+
+		def self.inherited(node_class)
+			super
+
+			if node_class.name
+				node_class.class_eval("def accept(visitor) = visitor.#{node_class.visit_method}(self)", __FILE__, __LINE__)
+			else
+				node_class.define_method(:accept, Node.instance_method(:accept))
+			end
+		end
+
+		def self.method_added(method_name)
+			super
+			return unless :initialize == method_name
+
+			@attributes = nil
+			class_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+				# frozen_string_literal: true
+
+				def copy(#{attributes.map { |name| "#{name}: @#{name}" }.join(', ')})
+					self.class.new(prism_node: @prism_node, #{attributes.map { |name| "#{name}:" }.join(', ')})
+				end
+
+				def freeze
+					#{attributes.map { |name| "@#{name}.freeze if Array === @#{name} || Hash === @#{name} || String === @#{name}" }.join("\n")}
+					super
+				end
+			RUBY
+		end
+
+		attr_reader :prism_node
 
 		def type
 			self.class.type
@@ -46,31 +81,15 @@ module Refract
 		end
 
 		def accept(visitor)
-			self.class.class_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-				# frozen_string_literal: true
-
-				def accept(visitor)
-					visitor.visit_#{type}(self)
-				end
-			RUBY
-
-			accept(visitor)
+			visitor.__send__(self.class.visit_method, self)
 		end
 
 		def start_line
 			@prism_node&.location&.start_line
 		end
-
-		def copy(**props)
-			duplicate = dup
-
-			props.each do |k, v|
-				duplicate.public_send("#{k}=", v)
-			end
-
-			duplicate.freeze
-		end
 	end
+
+	extend self
 
 	def format_node(node)
 		Formatter.new.format_node(node).source

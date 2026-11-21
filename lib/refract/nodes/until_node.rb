@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :predicate, :statements, :inline
+		attr_reader :predicate, :statements, :inline
 	end
 end

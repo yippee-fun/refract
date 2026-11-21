@@ -7,7 +7,7 @@ module Refract
 		end
 
 		def self.visit(node_class, &)
-			define_method("visit_#{node_class.type}", &)
+			define_method(node_class.visit_method, &)
 		end
 
 		def around_visit(node)
@@ -24,6 +24,8 @@ module Refract
 		end
 
 		def visit_each(nodes)
+			return unless nodes
+
 			nodes = nodes.compact
 
 			i, len = 0, nodes.length

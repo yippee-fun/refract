@@ -7,19 +7,28 @@ require_relative "semantic_tree"
 module Corpus
 	extend self
 
+	GROUP_SIZE = 100
+
 	Failure = Data.define(:kind, :type, :detail, :path) do
 		def key = "#{kind} #{type}"
 	end
 
-	def files
-		stdlib = Dir[File.join(RbConfig::CONFIG["rubylibdir"], "**", "*.rb")]
+	def groups(filter = nil)
+		packages.flat_map do |package, files|
+			files = files.select { |path| path.include?(filter) } if filter
+			slices = files.sort.each_slice(GROUP_SIZE).to_a
+			slices.map.with_index(1) { |slice, index| ["#{package} #{index}/#{slices.length}", slice] }
+		end
+	end
 
+	def packages
 		gems = Dir[File.join(Gem.dir, "gems", "*")]
 			.group_by { |dir| File.basename(dir).sub(/-[^-]+\z/, "") }
 			.map { |_, dirs| dirs.max_by { |dir| Gem::Version.new(File.basename(dir)[/[^-]+\z/][/\A[\d.]+/] || "0") } }
-			.flat_map { |dir| Dir[File.join(dir, "**", "*.rb")] }
+			.sort
+			.to_h { |dir| [File.basename(dir), Dir[File.join(dir, "**", "*.rb")]] }
 
-		(stdlib + gems).sort
+		{ "ruby #{RUBY_VERSION}" => Dir[File.join(RbConfig::CONFIG["rubylibdir"], "**", "*.rb")], **gems }
 	end
 
 	def check(path)

@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :unescaped, :quoted
+		attr_reader :unescaped, :quoted
 	end
 end

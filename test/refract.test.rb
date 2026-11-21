@@ -885,6 +885,17 @@ class RefractTest < Quickdraw::Test
 		RUBY
 	end
 
+	test "a keyword hash leading a jump's arguments keeps its rockets" do
+		assert_formats "return :a => 1, b: 2", "return :a => 1, :b => 2"
+		assert_formats "loop { break :\"a b\" => 1 }", "loop {\n\tbreak :\"a b\" => 1\n}"
+		assert_formats "x = 1; [1].each { next :x => x }", "x = 1\n[\n\t1\n].each {\n\tnext :x => x\n}"
+		assert_formats "return 1, a: 1", "return 1, a: 1"
+	end
+
+	test "a concatenated string hash key round trips" do
+		assert_round_trip "x ?c \"s\" => x"
+	end
+
 	test "return" do
 		assert_refract <<~RUBY
 			def foo
@@ -940,9 +951,7 @@ class RefractTest < Quickdraw::Test
 			..10
 		RUBY
 
-		assert_refract <<~RUBY
-			1..
-		RUBY
+		assert_formats "1..", "(1..)"
 	end
 
 	test "hash pattern" do
@@ -1250,6 +1259,10 @@ class RefractTest < Quickdraw::Test
 		assert_formats "super", "super"
 	end
 
+	test "forwarding super with a block" do
+		assert_formats "super { b }", "super{\n\tb\n}"
+	end
+
 	test "nested multi targets keep their parentheses" do
 		assert_formats "def foo((a, b)); end", "def foo((a, b))\nend"
 		assert_formats "a, (b, c) = 1", "a, (b, c) = 1"
@@ -1369,7 +1382,6 @@ class RefractTest < Quickdraw::Test
 			body: [
 				Refract::CallNode.new(name: :a, variable_call: true),
 				Refract::StatementsNode.new(body: [Refract::StatementsNode.new(body: [])]),
-				Refract::MissingNode.new,
 				Refract::CallNode.new(name: :b, variable_call: true),
 			],
 		)
@@ -1453,7 +1465,7 @@ class RefractTest < Quickdraw::Test
 	test "hash signs followed by a closing delimiter do not become interpolation" do
 		assert_formats %q{'#$'}, %q{"\#$"}
 		assert_formats %q{'#@'}, %q{"\#@"}
-		assert_formats %q{%r{#$}}, %q{/\#$/}
+		assert_formats %q{%r{#$}}, "/#\\\n$/"
 		assert_formats %q{%x(#$)}, %q{`\#$`}
 	end
 
@@ -1517,8 +1529,8 @@ class RefractTest < Quickdraw::Test
 	end
 
 	test "low precedence receivers are parenthesized" do
-		assert_formats "not(a and b)", "(a and b).!"
-		assert_formats "not x = y", "(x = y).!"
+		assert_formats "not(a and b)", "!(a and b)"
+		assert_formats "not x = y", "!(x = y)"
 		assert_formats "(a.b = 1).c", "(a.b = 1).c"
 	end
 
@@ -1543,6 +1555,84 @@ class RefractTest < Quickdraw::Test
 		assert_formats "# frozen_string_literal: true\nx = \"\#{'a'}\"\ny = 'b'", "# frozen_string_literal: true\nx = \"\#{\"a\"}\"\ny = \"b\""
 	end
 
+	test "frozen_string_literal is found past empty interpolation" do
+		assert_refract "# frozen_string_literal: true\n\"\#{}\#{a}\"\nx = [\n\t\"b\"\n]"
+	end
+
+	test "frozen_string_literal is found in every place a string literal can carry it" do
+		assert_formats "# frozen_string_literal: true\nx = \"a\" \"b\"", "# frozen_string_literal: true\nx = \"ab\""
+		assert_refract "# frozen_string_literal: true\n{\n\t[\n\t\t\"a\"\n\t] => 1\n}"
+		assert_refract "# frozen_string_literal: true\n{\n\t1 => \"a\"\n}"
+		assert_refract "# frozen_string_literal: true\ncase x\nwhen [\n\t\"a\"\n]\n\t1\nend"
+		assert_refract "# frozen_string_literal: true\ncase x\nwhen 1\n\t\nwhen 2\n\t\"a\"\nend"
+		assert_refract "# frozen_string_literal: true\n\"\#{[\n\t\"a\"\n]}\""
+	end
+
+	test "a statement whose constant writes disagree gets a directive around each write" do
+		assert_formats "# shareable_constant_value: literal\n[A = [],\n# shareable_constant_value: none\nB = []]",
+			"[\n\t((\n\t\t# shareable_constant_value: literal\n\t\tA = [\n\t\t\t\n\t\t]\n\t\t# shareable_constant_value: none\n\t)),\n\t(B = [\n\t\t\n\t])\n]"
+	end
+
+	test "a statement inside a directive gets its own when its constant writes differ" do
+		assert_formats "# shareable_constant_value: literal\nif A = 1\n\t# shareable_constant_value: none\n\tfoo(B = [])\nend",
+			"# shareable_constant_value: literal\nif (A = 1)\n\t# shareable_constant_value: none\n\tfoo((B = [\n\t\t\n\t]))\n\t# shareable_constant_value: literal\nend\n# shareable_constant_value: none"
+	end
+
+	test "symbols with double quotes use single quotes when nothing needs escaping" do
+		assert_formats %q{x = :"a\"b"}, %q{x = :'a"b'}
+		assert_formats %q{x = :"a\"'"}, %q{x = :"a\"'"}
+		assert_formats "x = :\"é\\\"\"", "x = :'é\"'"
+		assert_formats "# coding: us-ascii\nx = :\"a\\\"\"", "# encoding: US-ASCII\nx = :'a\"'"
+		assert_formats "# coding: us-ascii\nx = :\"\\u00e9\\\"\"", "# encoding: US-ASCII\nx = :\"\\u{E9}\\\"\""
+	end
+
+	test "bare symbols" do
+		assert_formats "x = :é", "x = :é"
+		assert_formats "# coding: us-ascii\nx = :a", "# encoding: US-ASCII\nx = :a"
+	end
+
+	test "text after an embedded variable is only escaped when it would extend the name" do
+		assert_formats "\"\#$-w\" \"x\"", "\"\#$-wx\""
+		assert_formats "\"\#$;\" \"x\"", "\"\#$;x\""
+		assert_formats "@x = 1; \"\#@x\" \" y\"", "@x = 1\n\"\#@x y\""
+	end
+
+	test "word arrays in patterns and their guards" do
+		assert_formats "case x; in %w[a b]; end", "case x\nin %W[a b]\nend"
+		assert_formats "case x; in %w[a b] if y; end", "case x\nin %W[a b] if y\nend"
+		assert_formats "case x; in %i[a] unless y; end", "case x\nin %I[a] unless y\nend"
+	end
+
+	test "experimental shareable constant values" do
+		assert_refract "# shareable_constant_value: experimental_copy\nA = 1\n# shareable_constant_value: none"
+		assert_refract "# shareable_constant_value: experimental_everything\nA = 1\n# shareable_constant_value: none"
+	end
+
+	test "escapes that force a binary string keep it binary" do
+		program = Refract::Converter.new.visit(Prism.parse("# encoding: us-ascii\nx = \"\\xff\"").value)
+		string = program.statements.body.first.value.unescaped
+
+		assert_equal string.encoding, Encoding::BINARY
+		assert_equal string, "\xFF".b
+		assert_round_trip "# encoding: us-ascii\nx = \"\\xff\""
+	end
+
+	test "converter visit definitions check the node classes and results" do
+		assert_raises(ArgumentError) { Class.new(Refract::Converter) { visit("Prism::IntegerNode") { |node| node } } }
+		assert_raises(ArgumentError) { Class.new(Refract::Converter) { visit(String) { |node| node } } }
+		assert_raises(ArgumentError) { Class.new(Refract::Converter) { visit(Prism::Node) { |node| node } } }
+
+		integer, string = Prism.parse("1; 'a'").value.statements.body
+		converter = Class.new(Refract::Converter) { visit(Prism::IntegerNode) { |node| Refract::NilNode.new } }.new
+
+		assert Refract::NilNode === converter.visit(integer)
+		assert_equal converter.visit(string).unescaped, "a"
+		assert_raises(ArgumentError) { converter.visit_integer_node(string) }
+
+		converter = Class.new(Refract::Converter) { visit(Prism::IntegerNode, &:value) }.new
+		assert_raises(ArgumentError) { converter.visit(integer) }
+	end
+
 	test "nested shareable constant value directives restore the enclosing value" do
 		assert_formats "# shareable_constant_value: literal\nA = [begin\n\tB = 1\nend]", <<~RUBY
 			# shareable_constant_value: literal
@@ -1558,7 +1648,7 @@ class RefractTest < Quickdraw::Test
 
 		assert_formats "# shareable_constant_value: literal\nif A = 1\n\t# shareable_constant_value: none\n\tB = []\nend", <<~RUBY
 			# shareable_constant_value: literal
-			if A = 1
+			if (A = 1)
 				# shareable_constant_value: none
 				B = [
 					

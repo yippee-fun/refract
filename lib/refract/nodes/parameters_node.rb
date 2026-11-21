@@ -14,6 +14,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :requireds, :optionals, :rest, :posts, :keywords, :keyword_rest, :block
+		attr_reader :requireds, :optionals, :rest, :posts, :keywords, :keyword_rest, :block
 	end
 end

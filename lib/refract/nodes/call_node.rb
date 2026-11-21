@@ -14,6 +14,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :receiver, :name, :arguments, :block, :safe_navigation, :variable_call, :attribute_write
+		attr_reader :receiver, :name, :arguments, :block, :safe_navigation, :variable_call, :attribute_write
 	end
 end

@@ -11,6 +11,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :constant, :left, :requireds, :right
+		attr_reader :constant, :left, :requireds, :right
 	end
 end

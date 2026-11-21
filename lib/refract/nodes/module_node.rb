@@ -9,6 +9,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :constant_path, :body
+		attr_reader :constant_path, :body
 	end
 end

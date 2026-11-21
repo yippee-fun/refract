@@ -79,6 +79,8 @@ module SemanticTree
 			end
 		when *INTERPOLATED
 			[node.type, fields(node).map { |name, value| [name, (name == :parts) ? parts(node) : value] }]
+		when Prism::AssocNode
+			[node.type, fields(node).map { |name, value| [name, (name == :key) ? unfrozen(value) : value] }]
 		when *BODY_OWNERS
 			[node.type, fields(node).map { |name, value| [name, (name == :body) ? body(node.body) : value] }]
 		else
@@ -124,6 +126,17 @@ module SemanticTree
 			else
 				[field.name, node.public_send(field.name)]
 			end
+		end
+	end
+
+	# A hash freezes the string keys it's given, so whether the literal was
+	# already frozen makes no difference.
+	private def unfrozen(shape)
+		case shape
+		in [:string_node, [[:flags, flags], *rest]]
+			[:string_node, [[:flags, flags - [:frozen?]], *rest]]
+		else
+			shape
 		end
 	end
 

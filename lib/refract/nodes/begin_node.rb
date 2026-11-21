@@ -11,6 +11,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :statements, :rescue_clause, :else_clause, :ensure_clause
+		attr_reader :statements, :rescue_clause, :else_clause, :ensure_clause
 	end
 end

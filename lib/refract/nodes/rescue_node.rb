@@ -11,6 +11,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :exceptions, :reference, :statements, :subsequent
+		attr_reader :exceptions, :reference, :statements, :subsequent
 	end
 end

@@ -13,6 +13,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :parts, :ignore_case, :multi_line, :extended, :once, :encoding
+		attr_reader :parts, :ignore_case, :multi_line, :extended, :once, :encoding
 	end
 end

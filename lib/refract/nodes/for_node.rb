@@ -10,6 +10,6 @@ module Refract
 			freeze
 		end
 
-		attr_accessor :index, :collection, :statements
+		attr_reader :index, :collection, :statements
 	end
 end

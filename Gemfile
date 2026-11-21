@@ -7,11 +7,13 @@ gemspec
 
 group :test do
 	gem "quickdraw", github: "joeldrapper/quickdraw", ref: "8f2ab5b7d8f0d4a9edb0e9297403326de57d5825"
-	gem "simplecov", require: false, platform: :ruby
+end
+
+group :development, :test do
+	gem "rubocop"
 end
 
 group :development do
-	gem "rubocop", platform: :ruby
 	gem "ruby-lsp", platform: :ruby
 end
 
