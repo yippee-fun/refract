@@ -18,4 +18,4 @@ group :development do
 end
 
 gem "irb"
-gem "openssl"
+gem "openssl", platform: :mri

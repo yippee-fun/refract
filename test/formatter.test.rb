@@ -581,11 +581,22 @@ class FormatterTest < Quickdraw::Test
 	end
 
 	test "checking for a condition stays linear in the number of statements" do
-		node = statements(*Array.new(10_000) { range(var(:a), var(:b)) })
-		start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-		format(node)
+		# Best of three after a warm-up, so JIT compilation isn't timed.
+		time = lambda do |count|
+			node = statements(*Array.new(count) { range(var(:a), var(:b)) })
+			Array.new(3) do
+				start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+				format(node)
+				Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+			end.min
+		end
 
-		assert(Process.clock_gettime(Process::CLOCK_MONOTONIC) - start < 1)
+		time.call(1_000)
+		small = time.call(1_000)
+		large = time.call(10_000)
+
+		# Quadratic work would take a hundred times as long.
+		assert(large < small * 40)
 	end
 
 	test "word list elements and imaginary rationals claim their lines in the source map" do
@@ -658,7 +669,11 @@ class FormatterTest < Quickdraw::Test
 		assert_equal evaluate(if_else(statements(NilNode.new, match_last_line("a")))), false
 		assert_equal evaluate(write(:x, match_last_line("z"))), 0
 		assert_equal evaluate(write(:x, flip_flop(TrueNode.new, var(:b)))), true
-		assert_equal evaluate(Converter.new.visit(Prism.parse("if ((1..b)) then true else false end").value)), false
+		# TruffleRuby treats an integer literal in a flip-flop as true rather than comparing it with `$.`.
+		unless RUBY_ENGINE == "truffleruby"
+			assert_equal evaluate(Converter.new.visit(Prism.parse("if ((1..b)) then true else false end").value)), false
+		end
+
 		assert_equal evaluate(Converter.new.visit(Prism.parse("if ((a..b)) then true else false end").value)), false
 		assert_equal evaluate(if_else(flip_flop(SourceLineNode.new, FalseNode.new))), true
 		assert_equal evaluate(Converter.new.visit(Prism.parse("if __LINE__..false then true else false end").value)), true
