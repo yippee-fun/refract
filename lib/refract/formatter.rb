@@ -1817,9 +1817,15 @@ module Refract
 		end
 
 		private def escape_string(string, delimiter)
-			string = string.b unless string.encoding == Encoding::UTF_8 && string.valid_encoding?
-
 			pattern = ESCAPE_PATTERNS.fetch(delimiter)
+
+			# Bytes that aren't valid UTF-8 can't be written as they are, and Rubies
+			# disagree on whether a high byte is printable, so all are escaped.
+			unless string.encoding == Encoding::UTF_8 && string.valid_encoding?
+				string = string.b
+				pattern = Regexp.union(pattern, NON_ASCII)
+			end
+
 			pattern = Regexp.union(pattern, NON_ASCII) if escape_non_ascii?
 
 			string.gsub(pattern) { |char| escape_character(char) }
@@ -1830,7 +1836,7 @@ module Refract
 				escape
 			elsif char.bytesize > 1
 				format("\\u{%X}", char.ord)
-			elsif char.match?(/[[:print:]]/)
+			elsif char.ascii_only? && char.match?(/[[:print:]]/)
 				"\\#{char}"
 			else
 				format("\\x%02X", char.ord)

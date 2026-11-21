@@ -1104,6 +1104,8 @@ class RefractTest < Quickdraw::Test
 
 	test "string with invalid encoding is escaped bytewise" do
 		assert_formats %q{"\xff\xfe"}, %q{"\xFF\xFE"}
+		assert_formats %q{"caf\xc3\xa9 \xc3"}, %q{"caf\xC3\xA9 \xC3"}
+		assert_formats %q{"\xff" + "\u00e9"}, %Q{"\\xFF".+("\u00E9")}
 	end
 
 	test "string prefers single quotes when that avoids escaping" do
