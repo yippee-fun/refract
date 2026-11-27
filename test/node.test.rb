@@ -106,16 +106,17 @@ class NodeTest < Quickdraw::Test
 
 	test "a node class named after it's defined dispatches by that name" do
 		node_class = Class.new(Refract::CallNode)
-		NodeTest.const_set(:LaterNamedNode, node_class)
+		# Quickdraw wraps test files in an anonymous module, which TruffleRuby doesn't name constants under.
+		Object.const_set(:RefractLaterNamedNode, node_class)
 
 		visitor = Class.new(Refract::BasicVisitor) do
 			visit(node_class) { |node| node.name }
 		end.new
 
-		assert_equal node_class.type, "later_named_node"
+		assert_equal node_class.type, "refract_later_named_node"
 		assert_equal visitor.visit(node_class.new(name: :foo)), :foo
 	ensure
-		NodeTest.__send__(:remove_const, :LaterNamedNode) if NodeTest.const_defined?(:LaterNamedNode, false)
+		Object.__send__(:remove_const, :RefractLaterNamedNode) if Object.const_defined?(:RefractLaterNamedNode, false)
 	end
 
 	test "attributes list required keywords first, in the same order on every Ruby" do
