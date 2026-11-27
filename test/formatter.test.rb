@@ -93,6 +93,7 @@ class FormatterTest < Quickdraw::Test
 		"in" => -> { MatchPredicateNode.new(value: var(:a), pattern: int(1)) },
 		"write" => -> { write(:x, var(:a)) },
 		"attribute write" => -> { call(:b=, var(:c), receiver: var(:a), attribute_write: true) },
+		"index write" => -> { call(:[]=, int(0), var(:c), receiver: var(:a), attribute_write: true) },
 		"multiple write" => -> { MultiWriteNode.new(lefts: [target(:p), target(:q)], rest: nil, rights: [], value: var(:r)) },
 		"range" => -> { range(var(:a), var(:b)) },
 		"endless range" => -> { range(var(:a), nil) },
@@ -183,6 +184,28 @@ class FormatterTest < Quickdraw::Test
 		assert_tree(if_node(var(:a), var(:b), subsequent: if_modifier(var(:c), var(:d))))
 	end
 
+	test "a range pattern pins ends that can't be written as literals" do
+		{ RationalNode.new(numerator: 1, denominator: 3) => "(1r/3)", ImaginaryNode.new(numeric: RationalNode.new(numerator: 1, denominator: 3)) => "(1ri/3)" }.each do |left, written|
+			assert_equal format(CaseMatchNode.new(predicate: var(:x), conditions: [InNode.new(pattern: range(left, int(1)), statements: nil)], else_clause: nil)), "case x\nin ^(#{written}..1)\nend"
+		end
+	end
+
+	test "imaginary floats are written as literals unless they aren't finite" do
+		assert_equal format(ImaginaryNode.new(numeric: FloatNode.new(value: 2.5))), "2.5i"
+		assert_equal format(ImaginaryNode.new(numeric: FloatNode.new(value: Float::INFINITY))), "(::Complex.rectangular(0, ::Float::INFINITY))"
+	end
+
+	test "a hand-built program's encoding decides how non-ASCII is written" do
+		body = statements(StringNode.new(unescaped: "\u00e9"))
+
+		assert_equal format(ProgramNode.new(statements: body, encoding: Encoding::US_ASCII)), "# encoding: US-ASCII\n\"\\u{E9}\""
+		assert_equal format(ProgramNode.new(statements: body)), "\"\u00e9\""
+	end
+
+	test "formatting nothing gives empty source" do
+		assert_equal format(nil), ""
+	end
+
 	test "rationals with repeating decimals stay exact, including imaginary ones" do
 		assert_equal format(RationalNode.new(numerator: 1, denominator: 3)), "(1r/3)"
 		assert_equal format(ImaginaryNode.new(numeric: RationalNode.new(numerator: -1, denominator: 3))), "(-1ri/3)"
@@ -203,9 +226,26 @@ class FormatterTest < Quickdraw::Test
 			call(:!, receiver: regexp("a")),
 			if_node(flip_flop(range(var(:a), var(:b)), regexp("c")), var(:d)),
 			if_node(BeginNode.new(statements: statements(regexp("a")), rescue_clause: nil, else_clause: nil, ensure_clause: nil), var(:c)),
+			if_node(BeginNode.new(statements: statements(range(var(:a), var(:b))), rescue_clause: RescueNode.new(exceptions: [], reference: nil, statements: statements(var(:e)), subsequent: nil), else_clause: nil, ensure_clause: nil), var(:c)),
+			if_node(statements(var(:x), range(var(:a), var(:b))), var(:c)),
+			if_node(ParenthesesNode.new(body: statements(var(:x), statements(range(var(:a), var(:b))))), var(:c)),
 		].each { |node| assert_tree(node) }
 
 		assert_round_trip "if begin /a/ end then b end"
+		assert_equal format(if_node(flip_flop(statements(var(:x), SourceLineNode.new), var(:b)), var(:c))), "if ((\n\tx\n\t(__LINE__ if true)\n)..b)\n\tc\nend"
+	end
+
+	# Prism reads these regexps as values, but parse.y reads a regexp that ends
+	# statements or a begin with a rescue in a condition as a match against $_.
+	test "a regexp that ends a condition stays a regexp in any parser" do
+		rescued = -> (body) { BeginNode.new(statements: body, rescue_clause: RescueNode.new(exceptions: [], reference: nil, statements: statements(var(:e)), subsequent: nil), else_clause: nil, ensure_clause: nil) }
+
+		assert_equal format(if_node(statements(var(:x), regexp("a")), var(:c))), "if (\n\tx\n\t(/a/ if true)\n)\n\tc\nend"
+		assert_equal format(if_node(statements(var(:x), statements(var(:y), regexp("a"))), var(:c))), "if (\n\tx\n\ty\n\t(/a/ if true)\n)\n\tc\nend"
+		assert_equal format(if_node(ParenthesesNode.new(body: statements(var(:x), regexp("a"))), var(:c))), "if (x\n(/a/ if true))\n\tc\nend"
+		assert_equal format(if_node(rescued.(statements(regexp("a"))), var(:c))), "if begin\n\t(/a/ if true)\nrescue\n\te\nend\n\tc\nend"
+		assert_equal format(if_node(and_node(var(:y), statements(var(:x), regexp("a"))), var(:c))), "if (y && (\n\tx\n\t(/a/ if true)\n))\n\tc\nend"
+		assert_equal format(if_node(call(:!, receiver: statements(var(:x), regexp("a"))), var(:c))), "if !(\n\tx\n\t(/a/ if true)\n)\n\tc\nend"
 	end
 
 	test "a flip-flop or match-last-line outside a condition is put in one" do
@@ -660,6 +700,11 @@ class FormatterTest < Quickdraw::Test
 			assert_equal evaluate(if_else(and_node(parenthesized(NilNode.new, value), TrueNode.new))), true
 			assert_equal evaluate(if_else(begin_rescue(value))), true
 			assert_equal evaluate(if_else(flip_flop(value, FalseNode.new))), true
+
+			inner = statements(NilNode.new, value)
+			[and_node(TrueNode.new, inner), or_node(FalseNode.new, inner), parenthesized(inner), BeginNode.new(statements: inner, rescue_clause: nil, else_clause: nil, ensure_clause: nil), statements(NilNode.new, inner)].each do |middle|
+				assert_equal evaluate(if_else(statements(NilNode.new, middle))), true
+			end
 		end
 	end
 
