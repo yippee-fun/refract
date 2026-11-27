@@ -16,6 +16,7 @@ class VisitorTest < Quickdraw::Test
 		a ||= 2
 		a &&= 3
 		b, (c, *d, e), f = 1, 2
+		g, *h, i = 1
 		f, = g
 		@a = @b
 		@a += 1
@@ -47,6 +48,9 @@ class VisitorTest < Quickdraw::Test
 		x.y ||= 1
 		x.y &&= 1
 		x.y, = 1
+		x&.y += 1
+		x&.y ||= 1
+		x&.y &&= 1
 		x[1] = 2
 		x[1] += 1
 		x[1] ||= 1
@@ -55,9 +59,9 @@ class VisitorTest < Quickdraw::Test
 		foo(1, *a, **b, &c)
 		foo(k: 1, "s": 2, **h)
 		{ a: 1, **h }
-		[1, 2.0, 3r, 4i, "s", :sym, :"d#{a}", "i#{a}#@b", `x`, `x#{a}`, /r/, /r#{a}/, nil, true, false, self]
+		[1, 2.0, 3r, 4i, "s", :sym, :"d#{a}", "i#{a}#@b", `x`, `x#{a}`, /r/, /r#{a}/, nil, /r/imxo, /r#{a}/imxon, /r/u, /r/e, /r/s, true, false, self]
 		1..2
-		1...
+		(1...)
 		__FILE__; __LINE__; __ENCODING__
 		$1; $&
 		defined?(a)
@@ -68,11 +72,14 @@ class VisitorTest < Quickdraw::Test
 		while a do b end
 		until a do b end
 		b while a
+		b until a
+		b unless a
 		for i, j in k do l end
 		case a when 1, 2 then b else c end
 		case a
 		in [1, *r, 2] then 1
 		in [*, 3, *] then 2
+		in C[*, 3, *] then 2
 		in { k: 1, **rest } then 3
 		in { k: } then 3
 		in { **nil } then 3
@@ -90,7 +97,10 @@ class VisitorTest < Quickdraw::Test
 		/(?<named>x)/ =~ s
 		if /m/ then 1 end
 		if /m#{a}/ then 1 end
+		if /m/imxon then 1 end
+		if /m#{a}/imxon then 1 end
 		if (a == 1)..(a == 2) then 1 end
+		if (a == 1)...(a == 2) then 1 end
 		begin
 			a
 		rescue A, B => e
@@ -107,6 +117,9 @@ class VisitorTest < Quickdraw::Test
 			yield 1
 			super
 			super(1)
+			super { }
+			super(1) { }
+			super(1, &h)
 			return 1
 		end
 		def n(...) = o(...)
@@ -114,10 +127,14 @@ class VisitorTest < Quickdraw::Test
 		def q(**nil); end
 		def self.r((a, b), c) = a
 		class K < L; end
+		class K; a; end
 		class << self; end
+		class << self; a; end
 		module M; end
+		module M; a; end
 		x.each { |a, (b, c); d| next a }
 		x.each { break }
+		x.each { break 1 }
 		loop { redo }
 		-> (a) { a }
 		-> { it }
@@ -208,6 +225,55 @@ class VisitorTest < Quickdraw::Test
 		assert_equal node_classes - descendants(convert(EVERY_NODE)).map(&:class), [Refract::MissingNode]
 	end
 
+	test "the every node source sets every attribute a parse without errors can set" do
+		set = descendants(convert(EVERY_NODE)).flat_map do |node|
+			node.deconstruct_keys(nil).filter_map { |name, value| [node.class, name] unless value.nil? || value == false || value == [] }
+		end
+
+		unset = descendants(convert(EVERY_NODE)).flat_map { |node| node.class.attributes.map { |name| [node.class, name] } }.uniq - set
+
+		# Prism rejects `a&.b, = 1` and blocks in index writes.
+		assert_equal unset.sort_by(&:inspect), [
+			[Refract::CallTargetNode, :safe_navigation],
+			[Refract::IndexAndWriteNode, :block],
+			[Refract::IndexOperatorWriteNode, :block],
+			[Refract::IndexOrWriteNode, :block],
+			[Refract::IndexTargetNode, :block],
+		]
+	end
+
+	test "the every node source formats to code that means the same" do
+		result = SemanticTree.round_trip(EVERY_NODE)
+
+		assert(result.errors.empty?) { "#{result.source}\n\n#{result.errors.map(&:message).join("\n")}" }
+		assert(result.mismatch.nil?) { "#{result.source}\n\n#{result.mismatch.inspect}" }
+	end
+
+	test "converted nodes keep the Prism node they came from" do
+		program = Prism.parse(EVERY_NODE).value
+		prism_nodes = {}.compare_by_identity
+		queue = [program]
+
+		while (prism_node = queue.shift)
+			prism_nodes[prism_node] = true
+			queue.concat(prism_node.compact_child_nodes)
+		end
+
+		descendants(Refract::Converter.new.visit(program)).each do |node|
+			assert(prism_nodes.key?(node.prism_node)) { "#{node.type} has no Prism node from the parse" }
+			assert_equal node.prism_node.type, node.type.to_sym
+		end
+	end
+
+	test "nodes keep a Prism node and reject anything else" do
+		[*descendants(convert(EVERY_NODE)).uniq(&:class), Refract::MissingNode.new(prism_node: Prism.parse("1").value)].each do |sample|
+			attributes = sample.deconstruct_keys(nil)
+
+			assert_same sample.class.new(prism_node: sample.prism_node, **attributes).prism_node, sample.prism_node
+			assert_raises(NoMatchingPatternError) { sample.class.new(prism_node: sample, **attributes) }
+		end
+	end
+
 	test "visitor visits every child of every node type" do
 		tree = convert(EVERY_NODE)
 		recorder = Recorder.new
@@ -237,6 +303,32 @@ class VisitorTest < Quickdraw::Test
 
 			assert_equal recorder.visited, descendants(node)
 			assert_equal Refract::MutationVisitor.new.visit(node).deconstruct_keys(lists), lists.to_h { |name| [name, nil] }
+		end
+	end
+
+	test "visitors and the formatter keep the block of a hand-built index write" do
+		block = convert("foo(&b)").statements.body.first.block
+
+		{ "x[1] += 1" => "x[1, &b] += 1", "x[1] ||= 1" => "x[1, &b] ||= 1", "x[1] &&= 1" => "x[1, &b] &&= 1", "x[1], = 1" => "x[1, &b], = 1" }.each do |source, expected|
+			tree = convert(source)
+			statement = tree.statements.body.first
+
+			tree = case statement
+			in Refract::MultiWriteNode[lefts: [index]]
+				tree.copy(statements: tree.statements.copy(body: [statement.copy(lefts: [index.copy(block:)])]))
+			else
+				tree.copy(statements: tree.statements.copy(body: [statement.copy(block:)]))
+			end
+
+			recorder = Recorder.new
+			recorder.visit(tree)
+			rebuilder = Rebuilder.new
+			result = rebuilder.visit(tree)
+
+			assert recorder.visited.include?(block)
+			assert rebuilder.visited.include?(block)
+			assert_equal format(tree), expected
+			assert_equal format(result), expected
 		end
 	end
 

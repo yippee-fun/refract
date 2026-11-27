@@ -202,6 +202,11 @@ class RefractTest < Quickdraw::Test
 		RUBY
 
 		assert_refract <<~RUBY
+			class << self
+			end
+		RUBY
+
+		assert_refract <<~RUBY
 			class << obj
 				attr_accessor(:value)
 			end
@@ -554,6 +559,12 @@ class RefractTest < Quickdraw::Test
 				b
 			}
 		RUBY
+
+		assert_refract <<~RUBY
+			a { |b; c, d|
+				b
+			}
+		RUBY
 	end
 
 	test "block parameter" do
@@ -595,6 +606,12 @@ class RefractTest < Quickdraw::Test
 	test "break" do
 		assert_refract <<~RUBY
 			break foo
+		RUBY
+
+		assert_refract <<~RUBY
+			foo {
+				break
+			}
 		RUBY
 	end
 
@@ -737,6 +754,10 @@ class RefractTest < Quickdraw::Test
 		assert_refract <<~RUBY
 			yield(foo)
 		RUBY
+
+		assert_refract <<~RUBY
+			yield
+		RUBY
 	end
 
 	test "instance variable write" do
@@ -802,6 +823,18 @@ class RefractTest < Quickdraw::Test
 		RUBY
 
 		assert_refract <<~RUBY
+			if foo
+			end
+		RUBY
+
+		assert_refract <<~RUBY
+			if foo
+				bar
+			elsif baz
+			end
+		RUBY
+
+		assert_refract <<~RUBY
 			foo if (foo = true)
 		RUBY
 
@@ -832,6 +865,11 @@ class RefractTest < Quickdraw::Test
 		RUBY
 
 		assert_refract <<~RUBY
+			unless foo
+			end
+		RUBY
+
+		assert_refract <<~RUBY
 			foo unless (foo = true)
 		RUBY
 
@@ -852,6 +890,11 @@ class RefractTest < Quickdraw::Test
 		RUBY
 
 		assert_refract <<~RUBY
+			while foo
+			end
+		RUBY
+
+		assert_refract <<~RUBY
 			b.<<(i) while (i = a.pop)
 		RUBY
 	end
@@ -860,6 +903,11 @@ class RefractTest < Quickdraw::Test
 		assert_refract <<~RUBY
 			until foo
 				bar
+			end
+		RUBY
+
+		assert_refract <<~RUBY
+			until foo
 			end
 		RUBY
 
@@ -1174,6 +1222,13 @@ class RefractTest < Quickdraw::Test
 				"@a": 3,
 				"a b": 4,
 				a?: 5
+			}
+		RUBY
+
+		assert_refract <<~RUBY
+			{
+				"a": 1,
+				"a b": 2
 			}
 		RUBY
 	end

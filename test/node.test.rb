@@ -104,6 +104,58 @@ class NodeTest < Quickdraw::Test
 		assert_match(error.message, /Anonymous node classes have no type/)
 	end
 
+	test "a node class named after it's defined dispatches by that name" do
+		node_class = Class.new(Refract::CallNode)
+		# Quickdraw wraps test files in an anonymous module, which TruffleRuby doesn't name constants under.
+		Object.const_set(:RefractLaterNamedNode, node_class)
+
+		visitor = Class.new(Refract::BasicVisitor) do
+			visit(node_class) { |node| node.name }
+		end.new
+
+		assert_equal node_class.type, "refract_later_named_node"
+		assert_equal visitor.visit(node_class.new(name: :foo)), :foo
+	ensure
+		Object.__send__(:remove_const, :RefractLaterNamedNode) if Object.const_defined?(:RefractLaterNamedNode, false)
+	end
+
+	test "attributes list required keywords first, in the same order on every Ruby" do
+		assert_equal Refract::CallNode.attributes, [:name, :receiver, :arguments, :block, :safe_navigation, :variable_call, :attribute_write]
+		assert_equal Refract::IfNode.attributes, [:predicate, :inline, :statements, :subsequent]
+	end
+
+	test "redefining initialize updates the attributes, copy and freeze" do
+		node_class = Class.new(Refract::Node) do
+			def initialize(prism_node: nil, a:)
+				@prism_node = prism_node
+				@a = a
+				freeze
+			end
+
+			attr_reader :a
+		end
+
+		assert_equal node_class.attributes, [:a]
+
+		node_class.class_eval do
+			def initialize(prism_node: nil, a:, b:)
+				@prism_node = prism_node
+				@a = a
+				@b = b
+				freeze
+			end
+
+			attr_reader :b
+		end
+
+		node = node_class.new(a: [1], b: +"b")
+		copy = node.copy(b: {})
+
+		assert_equal node_class.attributes, [:a, :b]
+		assert_equal [copy.a, copy.b], [[1], {}]
+		assert [node.a, node.b, copy.b].all?(&:frozen?)
+	end
+
 	test "format node" do
 		assert_equal Refract.format_node(call), "foo(1, 2)"
 		assert_equal Class.new { include Refract }.new.format_node(call), "foo(1, 2)"
